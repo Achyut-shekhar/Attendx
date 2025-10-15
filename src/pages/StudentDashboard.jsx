@@ -152,7 +152,7 @@ const StudentDashboard = () => {
       name: "Database Systems",
       facultyName: "Prof. Jane Doe",
       attendanceRate: 88,
-      mode: "CODE",
+      mode: "LOCATION",
     },
     {
       id: "3",
@@ -328,6 +328,60 @@ const StudentDashboard = () => {
                             Enter Code
                           </Button>
                         )}
+                        {classItem.mode === "LOCATION" && (
+                          <Button
+                            className="w-full"
+                            onClick={() => {
+                              // Handle location check logic here
+                              if (navigator.geolocation) {
+                                navigator.geolocation.getCurrentPosition(
+                                  (position) => {
+                                    const { latitude, longitude } =
+                                      position.coords;
+                                    // Send the location data to the backend for verification
+                                    // You'll need to implement the API call to mark attendance with location
+                                    toast({
+                                      title: "Location Verified",
+                                      description: `Your location (${latitude}, ${longitude}) has been recorded.`,
+                                    });
+                                    setEndedClassIds((prev) => [
+                                      ...prev,
+                                      classItem.id,
+                                    ]);
+                                    toast({
+                                      title: "Class Ended",
+                                      description: `${classItem.name} has ended.`,
+                                    });
+                                  },
+                                  (error) => {
+                                    toast({
+                                      title: "Location Error",
+                                      description: `Error getting location: ${error.message}`,
+                                      variant: "destructive",
+                                    });
+                                  }
+                                );
+                              } else {
+                                toast({
+                                  title: "Geolocation Not Supported",
+                                  description:
+                                    "Geolocation is not supported by your browser.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            <MapPin className="h-4 w-4 mr-2" />
+                            Check Location
+                          </Button>
+                        )}
+                        {classItem.mode !== "CODE" &&
+                          classItem.mode !== "LOCATION" && (
+                            // Render some default/fallback UI if mode is neither CODE nor LOCATION
+                            <div className="text-center">
+                              Attendance Method Not Specified
+                            </div>
+                          )}
                       </>
                     )}
                     {classItem.mode === "MANUAL" && (
