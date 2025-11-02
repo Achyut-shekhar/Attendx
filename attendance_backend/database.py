@@ -22,3 +22,29 @@ def get_connection():
     This returns a SQLAlchemy Connection object.
     """
     return engine.connect()
+
+
+
+import psycopg2
+
+def test_connection():
+    try:
+        conn = psycopg2.connect(
+            host="localhost",
+            database="attendance_management",
+            user="anshikanautiyal",  # replace if needed
+            password="your_password_here"  # your local postgres password
+        )
+        cur = conn.cursor()
+        cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public';")
+        tables = cur.fetchall()
+        print("✅ Connected successfully! Tables found:")
+        for table in tables:
+            print("-", table[0])
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print("❌ Connection failed:", e)
+
+if __name__ == "__main__":
+    test_connection()
