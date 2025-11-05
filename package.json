@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "backend": "cd backend && npm start",
-    "frontend": "vite",
-    "start:dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "dev:win": "powershell -File .\\run-dev.ps1",
+    "dev:unix": "bash ./run-dev.sh",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

@@ -1,14 +1,18 @@
-# EduAttend - Faculty Student Attendance Management System
+# Faculty Student Hub
 
-A modern web application for managing student attendance with real-time updates and multiple attendance marking methods.
+A web application for managing student attendance using QR codes and location-based verification.
 
 ## Features
 
-- **User Authentication**
-
-  - Role-based access (Faculty/Student)
-  - Secure JWT-based authentication
-  - Protected routes and API endpoints
+- Faculty can create and manage classes
+- Generate QR codes for attendance
+- Location-based attendance verification
+- Real-time attendance tracking
+- Student dashboard for viewing attendance records
+- Protected routes and API endpoints
+- Persistent data storage in PostgreSQL database
+- Real-time notifications for session events
+- Comprehensive attendance history and statistics
 
 - **Faculty Features**
 
@@ -36,84 +40,96 @@ A modern web application for managing student attendance with real-time updates 
 
 ### Backend
 
-- Node.js with Express
+- FastAPI (Python)
+- PostgreSQL Database
 - JWT for authentication
-- In-memory data store
 - RESTful API architecture
+
+### Database Structure
+
+- Users (Faculty and Students)
+- Classes
+- Class Enrollments
+- Attendance Sessions
+- Attendance Records
+- Notifications
+
+### Storage Architecture
+
+- Database: Stores all persistent data including users, classes, attendance records, and notifications
+- LocalStorage: Manages session data like authentication tokens
 
 ## Getting Started
 
-### Prerequisites
+## Prerequisites
 
-- Node.js (v14 or higher)
-- npm (v6 or higher)
+- Python 3.11+
+- Node.js 16+
+- PostgreSQL database
 
-### Installation
+## Setup
 
-1. Clone the repository:
+### Backend Setup
+
+1. Create and activate a virtual environment:
 
 ```bash
-git clone https://github.com/Achyut-shekhar/facul-student-hub.git
-cd facul-student-hub
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+.\\venv\\Scripts\\Activate.ps1  # Windows
 ```
 
-2. Install dependencies:
+2. Install backend dependencies:
 
 ```bash
-# Install frontend dependencies
+cd attendance_backend
+pip install -r requirements.txt
+```
+
+3. Set up the PostgreSQL database:
+
+- Create a new database
+- Copy `.env.example` to `.env` and update the database connection string
+- Run database migrations:
+
+```bash
+python database_manager.py
+```
+
+4. Start the backend server:
+
+```bash
+python -m uvicorn main:app --reload
+```
+
+The backend will be running at http://127.0.0.1:8000
+
+### Frontend Setup
+
+1. Install frontend dependencies:
+
+```bash
 npm install
-
-# Install backend dependencies
-cd backend
-npm install
-cd ..
 ```
 
-### Running the Application
+2. Create a `.env` file in the root directory with:
 
-There are multiple ways to run the application. Choose the method that works best for your workflow:
-
-#### Option 1: Using the PowerShell Script (Recommended for Windows)
-
-This method automatically handles process cleanup and starts both servers:
-
-```powershell
-.\start-dev.ps1
+```
+VITE_API_URL=http://127.0.0.1:8000
 ```
 
-#### Option 2: Using npm Concurrent Script
-
-Run both servers using the concurrent script:
+3. Start the development server:
 
 ```bash
-npm run start:dev
+npm run dev
 ```
 
-#### Option 3: Running Servers Separately
+The frontend will be running at http://localhost:5173
 
-If you need to run the servers independently:
+## Test Accounts
 
-1. Start the Backend Server:
-
-```bash
-cd backend
-npm run dev    # Runs with nodemon for development
-# or
-npm start      # Runs without auto-reload
-```
-
-2. Start the Frontend Server (in a new terminal):
-
-```bash
-npm run frontend    # Starts Vite dev server
-```
-
-#### Development Ports
-
-The application will be available at:
-
-- Frontend: http://localhost:8080 (Vite)
-- Backend API: http://localhost:3001 (Express)
+- Faculty: faculty@school.edu (password: password)
+- Student: student@school.edu (password: password)
 
 #### Stopping the Servers
 
@@ -137,29 +153,26 @@ The application will be available at:
 
 ```
 facul-student-hub/
-├── backend/                # Backend server code
-│   ├── src/
-│   │   ├── controllers/   # Request handlers
-│   │   ├── middleware/    # Express middleware
-│   │   ├── routes/       # API route definitions
-│   │   ├── store/        # In-memory data store
-│   │   └── index.js      # Server entry point
-│   └── package.json
+├── attendance_backend/   # FastAPI backend
+│   ├── database.py      # Database connection
+│   ├── queries.py       # SQL queries
+│   ├── main.py         # API endpoints
+│   └── requirements.txt # Python dependencies
 │
-├── src/                   # Frontend source code
-│   ├── components/        # React components
-│   │   ├── ui/           # Shadcn UI components
-│   │   ├── layout/       # Layout components
-│   │   └── attendance/   # Attendance related components
-│   ├── contexts/         # React contexts
-│   ├── hooks/            # Custom React hooks
-│   ├── lib/              # Utility functions
-│   ├── pages/            # Page components
-│   ├── services/         # API services
-│   └── main.jsx         # Frontend entry point
+├── src/                 # Frontend source code
+│   ├── components/      # React components
+│   │   ├── ui/         # Shadcn UI components
+│   │   ├── layout/     # Layout components
+│   │   └── attendance/ # Attendance components
+│   ├── contexts/       # React contexts
+│   ├── hooks/          # Custom hooks
+│   ├── api/           # API services
+│   ├── lib/           # Utilities
+│   ├── pages/         # Page components
+│   └── main.jsx       # Entry point
 │
-├── public/               # Static assets
-├── start-dev.ps1        # Development startup script
+├── public/             # Static assets
+├── .env               # Environment variables
 └── package.json
 ```
 
@@ -197,11 +210,16 @@ facul-student-hub/
 
 ### Available Scripts
 
-- `npm run frontend` - Run frontend only
-- `npm run backend` - Run backend only
-- `npm run start:dev` - Run both frontend and backend
+- `npm run dev` - Start the frontend development server
+- `python -m uvicorn main:app --reload` - Start the backend server
 - `npm run build` - Build frontend for production
 - `npm run preview` - Preview production build
+
+### Database Tools
+
+- `python database_manager.py` - Run database migrations and setup
+- `python view_database.py` - View current database contents (users, classes, attendance, etc.)
+- `python create_demo_users.py` - Create demo users and sample data
 
 ## Deployment
 

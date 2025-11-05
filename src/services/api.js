@@ -1,15 +1,12 @@
 import axios from "axios";
 
-// const API_URL = "http://localhost:3001";
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:3001";
-
-
 // Create axios instance with default config
-const api = axios.create({
-  baseURL: API_URL,
+export const api = axios.create({
+  baseURL: "", // Remove /api since we'll add it in the interceptor
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
 // Add token to requests if available
@@ -19,9 +16,12 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Add /api prefix to all requests
+    config.url = `/api${config.url}`;
     return config;
   },
   (error) => {
+    console.error("API Request Error:", error);
     return Promise.reject(error);
   }
 );
@@ -46,12 +46,14 @@ api.interceptors.response.use(
 // Faculty API calls
 export const facultyAPI = {
   createClass: async (name) => {
-    const response = await api.post("/faculty/classes", { name });
+    const response = await api.post("/faculty/classes", {
+      class_name: name,
+    });
     return response.data;
   },
 
   getClasses: async () => {
-    const response = await api.get("/faculty/classes");
+    const response = await api.get("/api/faculty/classes");
     return response.data;
   },
 
@@ -76,15 +78,16 @@ export const facultyAPI = {
 // Student API calls
 export const studentAPI = {
   joinClass: async (joinCode) => {
-    const response = await api.post("/student/class/join", { joinCode });
+    const response = await api.post("/api/student/classes/join", {
+      join_code: joinCode,
+    });
     return response.data;
   },
 
   getEnrolledClasses: async () => {
-    const response = await api.get("/student/classes");
+    const response = await api.get("/api/student/classes");
     return response.data;
   },
-
   markAttendance: async (classId, code) => {
     const response = await api.post("/student/attendance/mark", {
       classId,

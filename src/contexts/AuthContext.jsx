@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../hooks/use-toast";
+import { authApi } from "../api/auth";
 
 const AuthContext = createContext();
 
@@ -15,67 +16,81 @@ export const AuthProvider = ({ children }) => {
   const { toast } = useToast();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
 
-  useEffect(() => {
-    // Check if user is already logged in
-    const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-
-    if (storedUser && token) {
-      setUser(JSON.parse(storedUser));
-    } else {
-      // Clear any incomplete state
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-      setUser(null);
-    }
-    setIsLoading(false);
-  }, []);
-
-  const login = async (email, password) => {
-    setIsLoading(true);
+  // Function to fetch user profile and notifications
+  const fetchUserProfile = async () => {
     try {
-      // const response = await fetch("http://localhost:3001/api/auth/login",
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, 
- {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const token = localStorage.getItem("token");
+      if (!token) return null;
 
-      const data = await response.json();
+      const userData = await authApi.getProfile();
+      if (!userData) return null;
 
-      if (!response.ok) {
-        // Clear any stale data
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        throw new Error(data.message || "Failed to login");
+      const userInfo = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+      };
+
+      setUser(userInfo);
+
+      if (userData.notifications) {
+        setNotifications(userData.notifications);
       }
 
-      if (!data.token) {
-        throw new Error("No token received from server");
+      return userData;
+    } catch (error) {
+      console.error("Failed to fetch user profile:", error);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const userData = await fetchUserProfile();
+        if (!userData) {
+          localStorage.removeItem("token");
+          setUser(null);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Set up periodic profile refresh (every 5 minutes)
+    const refreshInterval = setInterval(fetchUserProfile, 5 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  const login = async (email, password, role) => {
+    setIsLoading(true);
+    try {
+      const response = await authApi.login(email, password, role);
+      console.log("Login response:", response); // Debug log
+
+      if (!response || !response.access_token || !response.user) {
+        toast({
+          title: "Error",
+          description: "Invalid server response format",
+          variant: "destructive",
+        });
+        return false;
       }
 
       // Save token and user data
-      localStorage.setItem("token", data.token);
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          id: data.id,
-          name: data.name,
-          email: data.email,
-          role: data.role,
-        })
-      );
-
-      setUser({
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        role: data.role,
-      });
+      localStorage.setItem("token", response.access_token);
+      const userInfo = {
+        id: response.user.id,
+        name: response.user.name,
+        email: response.user.email,
+        role: response.user.role,
+      };
+      setUser(userInfo);
 
       toast({
         title: "Success",
@@ -115,11 +130,25 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      await api.patch(`/notifications/${notificationId}/mark-read`);
+      setNotifications((prev) =>
+        prev.filter((n) => n.notification_id !== notificationId)
+      );
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
+  };
+
   const value = {
     user,
     isLoading,
     login,
     logout,
+    notifications,
+    markNotificationAsRead,
+    refreshProfile: fetchUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

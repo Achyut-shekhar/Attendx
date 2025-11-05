@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAttendance } from "@/contexts/AttendanceContext";
 import { Badge } from "@/components/ui/badge";
 import ClassDetails from "@/components/ClassDetails";
@@ -48,9 +48,9 @@ const ClassCard = ({
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="text-lg">{classItem.name}</CardTitle>
+            <CardTitle className="text-lg">{classItem.class_name}</CardTitle>
             <CardDescription className="font-mono">
-              Code: {classItem.joinCode}
+              Code: {classItem.join_code}
             </CardDescription>
           </div>
           <div className="flex items-center space-x-2">
@@ -89,17 +89,17 @@ const ClassCard = ({
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="flex items-center space-x-2">
             <Users className="h-4 w-4 text-muted-foreground" />
-            <span>{classItem.studentsCount} students</span>
+            <span>{classItem.students_count || 0} students</span>
           </div>
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{classItem.sessionsCount} sessions</span>
+            <span>{classItem.sessions_count || 0} sessions</span>
           </div>
         </div>
 
-        {classItem.lastSession && (
+        {classItem.last_session && (
           <p className="text-xs text-muted-foreground">
-            Last session: {classItem.lastSession}
+            Last session: {classItem.last_session}
           </p>
         )}
 
@@ -159,55 +159,14 @@ const FacultyDashboard = () => {
   const navigate = useNavigate();
 
   const [classes, setClasses] = useState([]);
-
-  // Start session handler
-  const handleStartSession = async (classItem) => {
-    try {
-      const session = await facultyAPI.startSession(classItem.id);
-      startSession(classItem.id); // Keep local state in sync
-      toast({
-        title: "Session Started",
-        description: `${classItem.name} session is now active.`,
-      });
-      navigate(`/attendance/${classItem.id}?sessionId=${session.id}`);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to start session",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // End session handler
-  const handleEndSession = async (classItem) => {
-    try {
-      const activeSession = sessions[classItem.id];
-      if (!activeSession) {
-        throw new Error("No active session found");
-      }
-      await facultyAPI.endSession(classItem.id, activeSession.id);
-      endSession(classItem.id); // Keep local state in sync
-      toast({
-        title: "Session Ended",
-        description: `${classItem.name} session has been ended.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to end session",
-        variant: "destructive",
-      });
-    }
-  };
-
   const [newClass, setNewClass] = useState({ name: "", joinCode: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
+  const [endedClassIds, setEndedClassIds] = useState([]);
 
-  // Load classes from API
+  // 🟢 Load classes from API
   useEffect(() => {
     const loadClasses = async () => {
       try {
@@ -222,10 +181,10 @@ const FacultyDashboard = () => {
         setClasses([]);
       }
     };
-
     loadClasses();
   }, []);
 
+  // 🟢 Create new class
   const handleCreateClass = async () => {
     if (!newClass.name.trim()) {
       toast({
@@ -235,64 +194,75 @@ const FacultyDashboard = () => {
       });
       return;
     }
-
     try {
       const createdClass = await facultyAPI.createClass(newClass.name);
       setClasses([...classes, createdClass]);
       setNewClass({ name: "", joinCode: "" });
       setIsCreateDialogOpen(false);
-
       toast({
         title: "Class Created",
-        description: `${newClass.name} has been created successfully. Join Code: ${createdClass.joinCode}`,
+        description: `${newClass.name} created successfully.`,
       });
     } catch (error) {
       toast({
         title: "Error",
-        description:
-          error.message || "Failed to create class. Please try again.",
+        description: error.message || "Failed to create class.",
         variant: "destructive",
       });
     }
   };
 
-  const handleViewDetails = (classItem) => {
-    setSelectedClass(classItem);
-    setDetailsOpen(true);
+  // 🟢 Start session
+  const handleStartSession = async (classItem) => {
+    try {
+      console.log("Starting session for class:", classItem);
+      const session = await facultyAPI.startSession(classItem.class_id);
+      startSession(classItem.class_id);
+      toast({
+        title: "Session Started",
+        description: `${classItem.class_name} session is now active.`,
+      });
+      navigate(`/attendance/${classItem.class_id}?sessionId=${session.id}`);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start session",
+        variant: "destructive",
+      });
+    }
   };
 
-  // 🔹 Filtering logic
-  const filteredClasses = classes.filter((cls) =>
-    cls.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 🟢 End session
+  const handleEndSession = async (classItem) => {
+    try {
+      const activeSession = sessions[classItem.class_id];
+      if (!activeSession) throw new Error("No active session found");
+      await facultyAPI.endSession(classItem.class_id, activeSession.id);
+      endSession(classItem.class_id);
+      setEndedClassIds((prev) => [...prev, classItem.class_id]);
+      toast({
+        title: "Session Ended",
+        description: `${classItem.class_name} session has ended.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to end session",
+        variant: "destructive",
+      });
+    }
+  };
 
-  // Track ended sessions locally for demo
-  const [endedClassIds, setEndedClassIds] = useState([]);
-
-  const activeClasses = filteredClasses.filter(
-    (cls) =>
-      sessions[cls.id]?.status === "active" && !endedClassIds.includes(cls.id)
-  );
-  const endedClasses = filteredClasses.filter(
-    (cls) =>
-      sessions[cls.id]?.status === "ended" || endedClassIds.includes(cls.id)
-  );
-  const scheduledClasses = filteredClasses.filter(
-    (cls) =>
-      (!sessions[cls.id] ||
-        (sessions[cls.id]?.status !== "active" &&
-          sessions[cls.id]?.status !== "ended")) &&
-      !endedClassIds.includes(cls.id)
-  );
-
-  // Delete class handler
+  // 🟢 Delete class
   const handleDeleteClass = async (classItem) => {
     try {
-      await facultyAPI.deleteClass(classItem.id);
-      setClasses((prev) => prev.filter((cls) => cls.id !== classItem.id));
+      await facultyAPI.deleteClass(classItem.class_id);
+      setClasses((prev) =>
+        prev.filter((cls) => cls.class_id !== classItem.class_id)
+      );
       toast({
         title: "Class Deleted",
-        description: `${classItem.name} has been deleted.`,
+        description: `${classItem.class_name} has been deleted.`,
         variant: "destructive",
       });
     } catch (error) {
@@ -304,12 +274,40 @@ const FacultyDashboard = () => {
     }
   };
 
+  const handleViewDetails = (classItem) => {
+    setSelectedClass(classItem);
+    setDetailsOpen(true);
+  };
+
+  // 🟢 Filtered and categorized classes
+  const filteredClasses = classes.filter((cls) =>
+    cls.class_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const activeClasses = filteredClasses.filter(
+    (cls) =>
+      sessions[cls.class_id]?.status === "active" &&
+      !endedClassIds.includes(cls.class_id)
+  );
+  const endedClasses = filteredClasses.filter(
+    (cls) =>
+      sessions[cls.class_id]?.status === "ended" ||
+      endedClassIds.includes(cls.class_id)
+  );
+  const scheduledClasses = filteredClasses.filter(
+    (cls) =>
+      (!sessions[cls.class_id] ||
+        (sessions[cls.class_id]?.status !== "active" &&
+          sessions[cls.class_id]?.status !== "ended")) &&
+      !endedClassIds.includes(cls.class_id)
+  );
+
   return (
     <div className="min-h-screen bg-background" key={updateCounter}>
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Page Header */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 space-y-4 md:space-y-0">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
@@ -376,7 +374,7 @@ const FacultyDashboard = () => {
           </Dialog>
         </div>
 
-        {/* Search and Filter */}
+        {/* Search */}
         <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -393,14 +391,14 @@ const FacultyDashboard = () => {
           </Button>
         </div>
 
-        {/* Active Sessions */}
+        {/* Active */}
         {activeClasses.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Active Sessions</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {activeClasses.map((classItem) => (
                 <ClassCard
-                  key={classItem.id}
+                  key={classItem.class_id}
                   classItem={classItem}
                   status="active"
                   onViewDetails={handleViewDetails}
@@ -413,14 +411,14 @@ const FacultyDashboard = () => {
           </div>
         )}
 
-        {/* Ended Sessions */}
+        {/* Ended */}
         {endedClasses.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Ended Sessions</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {endedClasses.map((classItem) => (
                 <ClassCard
-                  key={classItem.id}
+                  key={classItem.class_id}
                   classItem={classItem}
                   status="ended"
                   onViewDetails={handleViewDetails}
@@ -433,16 +431,16 @@ const FacultyDashboard = () => {
           </div>
         )}
 
-        {/* Scheduled Classes */}
+        {/* Scheduled */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Your Classes</h2>
           {scheduledClasses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {scheduledClasses.map((classItem) => (
                 <ClassCard
-                  key={classItem.id}
+                  key={classItem.class_id}
                   classItem={classItem}
-                  status={getSessionStatus(classItem.id)}
+                  status={getSessionStatus(classItem.class_id)}
                   onViewDetails={handleViewDetails}
                   onDelete={handleDeleteClass}
                   onEndSession={handleEndSession}

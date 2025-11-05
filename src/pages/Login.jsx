@@ -1,10 +1,18 @@
 import React, { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { GraduationCap, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import {
+  GraduationCap,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  UserCircle2,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/enhanced-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Card,
   CardContent,
@@ -21,6 +29,7 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    role: "STUDENT", // Default role
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +54,11 @@ const Login = () => {
       return;
     }
 
-    const success = await login(formData.email, formData.password);
+    const success = await login(
+      formData.email,
+      formData.password,
+      formData.role
+    );
     if (!success) {
       setError(
         'Invalid credentials. Use faculty@school.edu or student@school.edu with password "password"'
@@ -66,8 +79,16 @@ const Login = () => {
 
   const handleDemoLogin = (role) => {
     const demoCredentials = {
-      FACULTY: { email: "faculty@school.edu", password: "password" },
-      STUDENT: { email: "student@school.edu", password: "password" },
+      FACULTY: {
+        email: "faculty@school.edu",
+        password: "password",
+        role: "FACULTY",
+      },
+      STUDENT: {
+        email: "student@school.edu",
+        password: "password",
+        role: "STUDENT",
+      },
     };
 
     setFormData(demoCredentials[role]);
@@ -96,6 +117,26 @@ const Login = () => {
               )}
 
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <RadioGroup
+                    defaultValue={formData.role}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, role: value })
+                    }
+                    className="flex space-x-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="STUDENT" id="student" />
+                      <Label htmlFor="student">Student</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="FACULTY" id="faculty" />
+                      <Label htmlFor="faculty">Faculty</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
