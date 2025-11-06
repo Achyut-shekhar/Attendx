@@ -18,18 +18,21 @@ import Register from "@/pages/Register";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <AttendanceProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+  // ✅ BrowserRouter moved to the top (this is important)
+  <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <AttendanceProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+
+                {/* Faculty route */}
                 <Route
                   path="/faculty-dashboard"
                   element={
@@ -38,6 +41,8 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+
+                {/* Student route */}
                 <Route
                   path="/student-dashboard"
                   element={
@@ -45,7 +50,9 @@ const App = () => (
                       <StudentDashboard />
                     </ProtectedRoute>
                   }
-                />
+                />    
+
+                {/* Attendance route */}
                 <Route
                   path="/attendance/:classId"
                   element={
@@ -54,15 +61,16 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+                {/* If page not found */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </AttendanceProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+            </TooltipProvider>
+          </AttendanceProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </BrowserRouter>
 );
 
 export default App;

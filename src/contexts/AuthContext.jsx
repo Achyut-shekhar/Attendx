@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useToast } from "../hooks/use-toast";
-import { authApi } from "../api/auth";
 
 const AuthContext = createContext();
 
@@ -18,97 +17,57 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
 
-  // Function to fetch user profile and notifications
-  const fetchUserProfile = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return null;
-
-      const userData = await authApi.getProfile();
-      if (!userData) return null;
-
-      const userInfo = {
-        id: userData.id,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-      };
-
-      setUser(userInfo);
-
-      if (userData.notifications) {
-        setNotifications(userData.notifications);
-      }
-
-      return userData;
-    } catch (error) {
-      console.error("Failed to fetch user profile:", error);
-      return null;
-    }
-  };
-
+  // ✅ Restore session from localStorage
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const userData = await fetchUserProfile();
-        if (!userData) {
-          localStorage.removeItem("token");
-          setUser(null);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-
-    // Set up periodic profile refresh (every 5 minutes)
-    const refreshInterval = setInterval(fetchUserProfile, 5 * 60 * 1000);
-    return () => clearInterval(refreshInterval);
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setIsLoading(false);
   }, []);
 
+  // ✅ Login function (connects to backend)
   const login = async (email, password, role) => {
     setIsLoading(true);
     try {
-      const response = await authApi.login(email, password, role);
-      console.log("Login response:", response); // Debug log
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-      if (!response || !response.access_token || !response.user) {
-        toast({
-          title: "Error",
-          description: "Invalid server response format",
-          variant: "destructive",
-        });
-        return false;
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      console.log("✅ Login response:", data);
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Invalid credentials");
       }
 
-      // Save token and user data
-      localStorage.setItem("token", response.access_token);
+      // ✅ Create user info structure
       const userInfo = {
-        id: response.user.id,
-        name: response.user.name,
-        email: response.user.email,
-        role: response.user.role,
+        id: data.user_id,
+        name: data.name,
+        email: email,
+        role: data.role,
       };
+
+      // ✅ Save locally
+      localStorage.setItem("user", JSON.stringify(userInfo));
       setUser(userInfo);
 
       toast({
-        title: "Success",
-        description: "Logged in successfully",
+        title: "Welcome back!",
+        description: `Logged in as ${data.role}`,
       });
 
-      return true;
+      return true; // success
     } catch (error) {
-      console.error("Login error:", error);
-      // Clear any stale auth data
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      setUser(null);
-
+      console.error("❌ Login error:", error);
       toast({
         title: "Login Failed",
-        description:
-          'Please use faculty@school.edu or student@school.edu with password "password"',
+        description: error.message || "Invalid credentials",
         variant: "destructive",
       });
       return false;
@@ -117,38 +76,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ Logout clears data
   const logout = () => {
-    // Clear all auth-related data
     localStorage.removeItem("user");
-    localStorage.removeItem("token");
     setUser(null);
-
-    // Notify user
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out",
     });
   };
 
-  const markNotificationAsRead = async (notificationId) => {
-    try {
-      await api.patch(`/notifications/${notificationId}/mark-read`);
-      setNotifications((prev) =>
-        prev.filter((n) => n.notification_id !== notificationId)
-      );
-    } catch (error) {
-      console.error("Failed to mark notification as read:", error);
-    }
-  };
-
+  // ✅ Context shared across the app
   const value = {
     user,
     isLoading,
     login,
     logout,
     notifications,
-    markNotificationAsRead,
-    refreshProfile: fetchUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

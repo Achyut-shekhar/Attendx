@@ -1,74 +1,52 @@
-import { api } from "../services/api";
+// src/api/auth.js
 
+// Base API URL (from .env or fallback to localhost)
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+// 🟢 LOGIN API
+async function login(email, password, role) {
+  try {
+    const response = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password, role }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Invalid credentials");
+    }
+
+    return response.json(); // Should contain access_token + user
+  } catch (error) {
+    console.error("Login API error:", error);
+    throw error;
+  }
+}
+
+// 🟢 FETCH PROFILE API
+async function getProfile() {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("No token found");
+
+  const response = await fetch(`${API_URL}/profile`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "Failed to fetch profile");
+  }
+
+  return response.json();
+}
+
+// ✅ Export object for AuthContext
 export const authApi = {
-  async login(email, password, role) {
-    try {
-      const response = await api.post("/auth/login", {
-        email,
-        password,
-        role,
-      });
-
-      console.log("Raw server response:", response.data);
-
-      // The backend returns { access_token, token_type, user: {...} }
-      const { access_token, token_type, user } = response.data;
-
-      if (!access_token || !user) {
-        throw new Error("Invalid response format from server");
-      }
-
-      // Return the response in the exact format the backend sends
-      return {
-        access_token,
-        token_type,
-        user,
-      };
-    } catch (error) {
-      // Log the error details for debugging
-      console.error("Login error details:", {
-        error: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      throw error;
-    }
-  },
-
-  async register(userData) {
-    try {
-      const response = await api.post("/auth/register", userData);
-      return response.data;
-    } catch (error) {
-      console.error(
-        "Registration error:",
-        error.response?.data || error.message
-      );
-      throw error;
-    }
-  },
-
-  async getProfile() {
-    try {
-      const response = await api.get("/users/me");
-      return response.data;
-    } catch (error) {
-      console.error(
-        "Get profile error:",
-        error.response?.data || error.message
-      );
-      throw error;
-    }
-  },
-
-  async logout() {
-    try {
-      const response = await api.post("/auth/logout");
-      localStorage.removeItem("token");
-      return response.data;
-    } catch (error) {
-      console.error("Logout error:", error.response?.data || error.message);
-      throw error;
-    }
-  },
+  login,
+  getProfile,
 };

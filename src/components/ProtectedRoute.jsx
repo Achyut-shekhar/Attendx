@@ -1,31 +1,31 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import React from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ProtectedRoute = ({ children, role }) => {
   const { user, isLoading } = useAuth();
 
+  // 🔹 While auth is loading (e.g., fetching profile)
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-lg font-semibold text-gray-600">Loading...</p>
       </div>
     );
   }
 
+  // 🔹 If not logged in → redirect to login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
+  // 🔹 If a role is specified and user role doesn’t match → redirect to login
   if (role && user.role !== role) {
-    const redirectTo = user.role === 'FACULTY' ? '/faculty-dashboard' : '/student-dashboard';
-    return <Navigate to={redirectTo} replace />;
+    return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  // ✅ If all checks pass, render the protected page
+  return children;
 };
 
 export default ProtectedRoute;
