@@ -236,8 +236,8 @@ const FacultyDashboard = () => {
   const handleEndSession = async (classItem) => {
     try {
       const activeSession = sessions[classItem.class_id];
-      if (!activeSession) throw new Error("No active session found");
-      await facultyAPI.endSession(classItem.class_id, activeSession.id);
+      if (!activeSession?.sessionId) throw new Error("No active session found");
+      await facultyAPI.endSession(classItem.class_id, activeSession.sessionId);
       endSession(classItem.class_id);
       setEndedClassIds((prev) => [...prev, classItem.class_id]);
       toast({
@@ -466,6 +466,14 @@ const FacultyDashboard = () => {
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedClass ? selectedClass.class_name : "Class Details"}
+            </DialogTitle>
+            <DialogDescription>
+              View attendance records and session details for this class
+            </DialogDescription>
+          </DialogHeader>
           {selectedClass && <ClassDetails classItem={selectedClass} />}
         </DialogContent>
       </Dialog>

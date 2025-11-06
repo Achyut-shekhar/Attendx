@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
-  const { login, user, isLoading } = useAuth(); // ✅ use AuthContext login()
+  const { login, user, isLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -30,21 +30,19 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Redirect if already logged in
+  // Redirect if already logged in
   if (user) {
     return (
       <Navigate
         to={
-          user.role === "FACULTY"
-            ? "/faculty-dashboard"
-            : "/student-dashboard"
+          user.role === "FACULTY" ? "/faculty-dashboard" : "/student-dashboard"
         }
         replace
       />
     );
   }
 
-  // ✅ Handle login & redirect
+  // Handle login & redirect
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -55,7 +53,6 @@ const Login = () => {
     }
 
     try {
-      // 🔹 Call login() from AuthContext (handles backend call)
       const success = await login(
         formData.email,
         formData.password,
@@ -63,13 +60,11 @@ const Login = () => {
       );
 
       if (success) {
-        // ✅ Success toast
         toast({
           title: "Welcome back!",
           description: `You are logged in as ${formData.role}`,
         });
 
-        // ✅ Redirect based on role
         if (formData.role === "STUDENT") {
           navigate("/student-dashboard", { replace: true });
         } else if (formData.role === "FACULTY") {
@@ -94,23 +89,6 @@ const Login = () => {
         variant: "destructive",
       });
     }
-  };
-
-  // ✅ Demo login autofill
-  const handleDemoLogin = (role) => {
-    const demoCredentials = {
-      FACULTY: {
-        email: "faculty@school.edu",
-        password: "password",
-        role: "FACULTY",
-      },
-      STUDENT: {
-        email: "student@school.edu",
-        password: "password",
-        role: "STUDENT",
-      },
-    };
-    setFormData(demoCredentials[role]);
   };
 
   return (
@@ -220,31 +198,6 @@ const Login = () => {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
-
-            {/* Demo accounts */}
-            <div className="mt-6">
-              <div className="text-center text-sm text-muted-foreground mb-4">
-                Demo Accounts
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("FACULTY")}
-                  className="text-xs"
-                >
-                  Faculty Demo
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("STUDENT")}
-                  className="text-xs"
-                >
-                  Student Demo
-                </Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

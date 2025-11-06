@@ -1,97 +1,183 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useAttendance } from "@/contexts/AttendanceContext";
 import { useToast } from "@/components/ui/use-toast";
+import { facultyAPI, studentAPI } from "@/services/api";
 import { useNavigate } from "react-router-dom";
-
-const studentsData = [
-    { id: 1, rollNo: "2023001", name: "Aarav Sharma", status: "Absent" },
-    { id: 2, rollNo: "2023002", name: "Aditi Singh", status: "Absent" },
-    { id: 3, rollNo: "2023003", name: "Arjun Reddy", status: "Absent" },
-    { id: 4, rollNo: "2023004", name: "Diya Patel", status: "Absent" },
-    { id: 5, rollNo: "2023005", name: "Ishaan Gupta", status: "Absent" },
-    { id: 6, rollNo: "2023006", name: "Kavya Mishra", status: "Absent" },
-    { id: 7, rollNo: "2023007", name: "Mohammed Khan", status: "Absent" },
-    { id: 8, rollNo: "2023008", name: "Neha Verma", status: "Absent" },
-    { id: 9, rollNo: "2023009", name: "Rohan Joshi", status: "Absent" },
-    { id: 10, rollNo: "2023010", name: "Saanvi Desai", status: "Absent" },
-];
 
 const CodeGeneration = ({ classId }) => {
   const [code, setCode] = useState("");
-  const [students, setStudents] = useState(studentsData);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const { endSession } = useAttendance();
+  const [attendanceStatus, setAttendanceStatus] = useState({});
+  const { getCurrentSession, endSession } = useAttendance();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const generateCode = () => {
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const data = await facultyAPI.getClassStudents(classId);
+        setStudents(data);
+        const statusMap = {};
+        data.forEach((s) => {
+          statusMap[s.user_id] = "Absent";
+        });
+        setAttendanceStatus(statusMap);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching students:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch students",
+          variant: "destructive",
+        });
+        setLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, [classId, toast]);
+
+  const generateCode = async () => {
     setIsGenerating(true);
-    const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setCode(randomCode);
+    const session = getCurrentSession(classId);
+    const codeToDisplay =
+      session?.generatedCode ||
+      Math.random().toString(36).substring(2, 8).toUpperCase();
+    setCode(codeToDisplay);
+
     // Simulate students marking attendance
     setTimeout(() => {
-        const updatedStudents = studentsData.map(s => {
-            if (Math.random() > 0.5) {
-                return {...s, status: "Present"};
-            }
-            return s;
-        });
-        setStudents(updatedStudents);
-        setIsGenerating(false);
+      const updatedStatus = { ...attendanceStatus };
+      students.forEach((s) => {
+        if (Math.random() > 0.3) {
+          updatedStatus[s.user_id] = "Present";
+        }
+      });
+      setAttendanceStatus(updatedStatus);
+      setIsGenerating(false);
     }, 3000);
   };
 
-  const handleEndSession = () => {
-    toast({
-      title: "Session Ended",
-      description: "The attendance session has been closed.",
-    });
-    endSession(classId);
-    navigate('/faculty-dashboard');
+  const handleEndSession = async () => {
+    try {
+      const session = getCurrentSession(classId);
+      if (!session?.sessionId) {
+        throw new Error("No active session found");
+      }
+
+      // Mark attendance for all "Present" students
+      for (const [studentId, status] of Object.entries(attendanceStatus)) {
+        if (status === "Present") {
+          await studentAPI.markAttendance({
+            session_id: session.sessionId,
+            student_id: parseInt(studentId),
+          });
+        }
+      }
+
+      const presentCount = Object.values(attendanceStatus).filter(
+        (s) => s === "Present"
+      ).length;
+
+      toast({
+        title: "Session Ended",
+        description: `${presentCount} students marked as present.`,
+      });
+
+      endSession(classId);
+      navigate("/faculty-dashboard");
+    } catch (error) {
+      console.error("Error ending session:", error);
+      toast({
+        title: "Error",
+        description: "Failed to end session",
+        variant: "destructive",
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Code Generation Attendance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Loading students...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Code Generation Attendance</CardTitle>
-        <CardDescription>Generate a code for students to mark their attendance.</CardDescription>
+        <CardDescription>
+          Generate a code for students to mark their attendance.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex gap-4 items-center mb-4">
-            <Button onClick={generateCode} disabled={isGenerating || code}>
-                {isGenerating ? "Generating..." : "Generate Code"}
-            </Button>
-            {code && <p className="text-2xl font-bold tracking-widest">{code}</p>}
+          <Button onClick={generateCode} disabled={isGenerating || code}>
+            {isGenerating ? "Generating..." : "Generate Code"}
+          </Button>
+          {code && <p className="text-2xl font-bold tracking-widest">{code}</p>}
         </div>
 
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Roll No</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
               <TableHead className="text-right">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {students.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell>{student.rollNo}</TableCell>
+              <TableRow key={student.user_id}>
                 <TableCell>{student.name}</TableCell>
+                <TableCell>{student.email}</TableCell>
                 <TableCell className="text-right">
-                    <Badge variant={student.status === 'Present' ? 'default' : 'destructive'}>
-                        {student.status}
-                    </Badge>
+                  <Badge
+                    variant={
+                      attendanceStatus[student.user_id] === "Present"
+                        ? "default"
+                        : "destructive"
+                    }
+                  >
+                    {attendanceStatus[student.user_id]}
+                  </Badge>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
         {code && (
-          <Button onClick={handleEndSession} variant="destructive" className="mt-4">
+          <Button
+            onClick={handleEndSession}
+            variant="destructive"
+            className="mt-4"
+          >
             End Session
           </Button>
         )}

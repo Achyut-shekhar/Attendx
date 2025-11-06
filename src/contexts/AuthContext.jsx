@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
 
       // ✅ Create user info structure
       const userInfo = {
-        id: data.user_id,
+        user_id: data.user_id,
         name: data.name,
         email: email,
         role: data.role,

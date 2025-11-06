@@ -3,13 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import { facultyAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 const ClassDetails = ({ classItem }) => {
   const { toast } = useToast();
   const [date, setDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [classDetails, setClassDetails] = useState(null);
+  const [allAttendanceRecords, setAllAttendanceRecords] = useState([]);
   const [dailyData, setDailyData] = useState(null);
 
   const selectedDate = date.toISOString().split("T")[0];
@@ -19,13 +28,11 @@ const ClassDetails = ({ classItem }) => {
       try {
         setLoading(true);
         setError(null);
-        const data = await facultyAPI.getClassDetails(classItem.id);
-        setClassDetails(data);
-        // Find attendance for selected date
-        const attendance =
-          data.sessions?.find((s) => s.date === selectedDate)?.attendance ||
-          null;
-        setDailyData(attendance);
+        const data = await facultyAPI.getClassDetails(classItem.class_id);
+        setAllAttendanceRecords(data || []);
+
+        // Process data for selected date
+        processDateData(data, selectedDate);
       } catch (error) {
         setError(error.message || "Failed to load class details");
         toast({
@@ -39,7 +46,51 @@ const ClassDetails = ({ classItem }) => {
     };
 
     fetchClassDetails();
-  }, [classItem.id, selectedDate]);
+  }, [classItem.class_id, toast]);
+
+  // Update daily data when date changes
+  useEffect(() => {
+    if (allAttendanceRecords.length > 0) {
+      processDateData(allAttendanceRecords, selectedDate);
+    }
+  }, [selectedDate, allAttendanceRecords]);
+
+  const processDateData = (records, dateStr) => {
+    // Filter records for the selected date
+    const dateRecords = records.filter((record) => {
+      if (!record.marked_at) return false;
+      const recordDate = new Date(record.marked_at).toISOString().split("T")[0];
+      return recordDate === dateStr;
+    });
+
+    if (dateRecords.length === 0) {
+      setDailyData(null);
+      return;
+    }
+
+    // Count present and absent
+    const presentCount = dateRecords.filter(
+      (r) => r.attendance_status === "PRESENT"
+    ).length;
+    const absentCount = dateRecords.filter(
+      (r) => !r.attendance_status || r.attendance_status !== "PRESENT"
+    ).length;
+
+    // Prepare absentee list
+    const absentees = dateRecords
+      .filter((r) => !r.attendance_status || r.attendance_status !== "PRESENT")
+      .map((r, idx) => ({
+        id: idx,
+        name: r.student_name || "Unknown",
+      }));
+
+    setDailyData({
+      presentCount,
+      absentCount,
+      absentees,
+      allRecords: dateRecords,
+    });
+  };
 
   if (loading) {
     return (
@@ -58,7 +109,7 @@ const ClassDetails = ({ classItem }) => {
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">
-        {classItem.name} - Attendance Details
+        {classItem.class_name} - Attendance Details
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-1 flex justify-center">
@@ -93,6 +144,45 @@ const ClassDetails = ({ classItem }) => {
                       </p>
                     </div>
                   </div>
+
+                  {/* Attendance Records Table */}
+                  <div className="mt-6">
+                    <h3 className="font-bold mb-3">Attendance Records</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Student Name</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Marked At</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dailyData.allRecords.map((record, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>
+                              {record.student_name || "N/A"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  record.attendance_status === "PRESENT"
+                                    ? "default"
+                                    : "destructive"
+                                }
+                              >
+                                {record.attendance_status || "ABSENT"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(record.marked_at).toLocaleTimeString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Absentees List */}
                   {dailyData.absentCount > 0 && (
                     <div>
                       <h3 className="font-bold mt-4">Absentees:</h3>
@@ -100,10 +190,9 @@ const ClassDetails = ({ classItem }) => {
                         {dailyData.absentees.map((student) => (
                           <li
                             key={student.id}
-                            className="flex items-center space-x-2 text-sm"
+                            className="flex items-center space-x-2 text-sm text-red-600"
                           >
-                            <span className="font-mono">{student.rollNo}</span>
-                            <span>-</span>
+                            <span>•</span>
                             <span>{student.name}</span>
                           </li>
                         ))}

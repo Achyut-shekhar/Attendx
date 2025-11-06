@@ -1,30 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useAttendance } from "@/contexts/AttendanceContext";
+import { facultyAPI, studentAPI } from "@/services/api";
 import { useNavigate } from "react-router-dom";
 
-const studentsData = [
-    { id: 1, rollNo: "2023001", name: "Aarav Sharma" },
-    { id: 2, rollNo: "2023002", name: "Aditi Singh" },
-    { id: 3, rollNo: "2023003", name: "Arjun Reddy" },
-    { id: 4, rollNo: "2023004", name: "Diya Patel" },
-    { id: 5, rollNo: "2023005", name: "Ishaan Gupta" },
-    { id: 6, rollNo: "2023006", name: "Kavya Mishra" },
-    { id: 7, rollNo: "2023007", name: "Mohammed Khan" },
-    { id: 8, rollNo: "2023008", name: "Neha Verma" },
-    { id: 9, rollNo: "2023009", name: "Rohan Joshi" },
-    { id: 10, rollNo: "2023010", name: "Saanvi Desai" },
-];
-
 const ManualAttendance = ({ classId }) => {
+  const [students, setStudents] = useState([]);
   const [attended, setAttended] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { endSession } = useAttendance();
+  const { endSession, getCurrentSession } = useAttendance();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const data = await facultyAPI.getClassStudents(classId);
+        setStudents(data);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching students:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch students",
+          variant: "destructive",
+        });
+        setLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, [classId, toast]);
 
   const handleCheckboxChange = (studentId) => {
     setAttended((prev) =>
@@ -34,14 +51,50 @@ const ManualAttendance = ({ classId }) => {
     );
   };
 
-  const handleSubmit = () => {
-    toast({
-      title: "Attendance Submitted",
-      description: `${attended.length} students marked as present.`,
-    });
-    endSession(classId);
-    navigate('/faculty-dashboard');
+  const handleSubmit = async () => {
+    try {
+      const session = getCurrentSession(classId);
+      if (!session?.sessionId) {
+        throw new Error("No active session found");
+      }
+
+      // Mark attendance for each selected student
+      for (const studentId of attended) {
+        await studentAPI.markAttendance({
+          session_id: session.sessionId,
+          student_id: studentId,
+        });
+      }
+
+      toast({
+        title: "Attendance Submitted",
+        description: `${attended.length} students marked as present.`,
+      });
+
+      endSession(classId);
+      navigate("/faculty-dashboard");
+    } catch (error) {
+      console.error("Error submitting attendance:", error);
+      toast({
+        title: "Error",
+        description: "Failed to submit attendance",
+        variant: "destructive",
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Manual Attendance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Loading students...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -52,27 +105,31 @@ const ManualAttendance = ({ classId }) => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Roll No</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
               <TableHead className="text-right">Present</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {studentsData.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell>{student.rollNo}</TableCell>
+            {students.map((student) => (
+              <TableRow key={student.user_id}>
                 <TableCell>{student.name}</TableCell>
+                <TableCell>{student.email}</TableCell>
                 <TableCell className="text-right">
                   <Checkbox
-                    checked={attended.includes(student.id)}
-                    onCheckedChange={() => handleCheckboxChange(student.id)}
+                    checked={attended.includes(student.user_id)}
+                    onCheckedChange={() =>
+                      handleCheckboxChange(student.user_id)
+                    }
                   />
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-        <Button onClick={handleSubmit} className="mt-4">Submit Attendance</Button>
+        <Button onClick={handleSubmit} className="mt-4">
+          Submit Attendance
+        </Button>
       </CardContent>
     </Card>
   );

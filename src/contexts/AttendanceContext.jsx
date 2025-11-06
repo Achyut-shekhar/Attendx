@@ -9,6 +9,15 @@ export const AttendanceProvider = ({ children }) => {
   const [sessions, setSessions] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // Helper function to save sessions to localStorage
+  const saveToLocalStorage = (sessionData) => {
+    try {
+      localStorage.setItem("attendance_sessions", JSON.stringify(sessionData));
+    } catch (error) {
+      console.error("Failed to save sessions to localStorage:", error);
+    }
+  };
+
   // Load active sessions from database on mount
   useEffect(() => {
     const loadActiveSessions = async () => {
@@ -51,7 +60,7 @@ export const AttendanceProvider = ({ children }) => {
     try {
       // First, create session in database
       const response = await api.post(`/faculty/classes/${classId}/sessions`);
-      const sessionData = response.data.session;
+      const sessionData = response.data;
 
       // Then update local state
       const newSessions = {
@@ -102,11 +111,20 @@ export const AttendanceProvider = ({ children }) => {
     return sessions[classId]?.status;
   };
 
+  // Get current session data for a class
+  const getCurrentSession = (classId) => {
+    return sessions[classId];
+  };
+
   const value = {
     sessions,
     startSession,
     endSession,
     getSessionStatus,
+    getCurrentSession,
+    // Expose current session info for convenience
+    sessionId: sessions[Object.keys(sessions)[0]]?.sessionId,
+    generatedCode: sessions[Object.keys(sessions)[0]]?.generatedCode,
   };
 
   return (
