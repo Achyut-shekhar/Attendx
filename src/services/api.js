@@ -102,6 +102,14 @@ export const facultyAPI = {
     return data;
   },
 
+  // Authoritative sessions stats (count + last session start)
+  async getClassSessionsStats(class_id) {
+    const { data } = await api.get(
+      `/faculty/classes/${class_id}/sessions/stats`
+    );
+    return data;
+  },
+
   // ✅ Date-level — used ONLY for calendar view
   async getClassAttendanceByDate(class_id, date) {
     const { data } = await api.get(

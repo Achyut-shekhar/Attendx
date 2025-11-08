@@ -42,6 +42,7 @@ const ClassCard = ({
   onDelete,
   onEndSession,
   onStartSession,
+  onGoToAttendance,
 }) => {
   return (
     <Card className="shadow-medium hover:shadow-large transition-all duration-300">
@@ -105,15 +106,22 @@ const ClassCard = ({
 
         <div className="flex space-x-2">
           <Button
-            variant="default"
+            variant={status === "active" ? "default" : "outline"}
             size="sm"
             className="w-full"
-            disabled={status === "active"}
-            onClick={() => onStartSession(classItem)}
+            onClick={() => {
+              if (status === "active") {
+                // Navigate to active attendance session
+                onGoToAttendance(classItem);
+              } else {
+                // Start a new session
+                onStartSession(classItem);
+              }
+            }}
           >
             <Play className="h-4 w-4 mr-2" />
             {status === "active"
-              ? "Session Active"
+              ? "Go to Attendance"
               : status === "ended"
               ? "Start New Session"
               : "Start Session"}
@@ -126,7 +134,7 @@ const ClassCard = ({
           >
             View Details
           </Button>
-          {status !== "ended" && (
+          {status === "active" && (
             <Button
               variant="destructive"
               size="sm"
@@ -165,12 +173,68 @@ const FacultyDashboard = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
   const [endedClassIds, setEndedClassIds] = useState([]);
+  const [activeSessions, setActiveSessions] = useState({});
 
+  // Helper: enrich a class with dynamic stats (students count, sessions count, last session time)
+  const enrichClassWithStats = async (cls) => {
+    try {
+      // Number of enrolled students
+      const students = await facultyAPI.getClassStudents(cls.class_id);
+      const students_count = Array.isArray(students) ? students.length : 0;
+
+      // Authoritative sessions stats from backend
+      const stats = await facultyAPI.getClassSessionsStats(cls.class_id);
+      const sessions_count = stats?.sessions_count ?? 0;
+      const last_session = stats?.last_session
+        ? new Date(stats.last_session).toLocaleString()
+        : null;
+
+      return { ...cls, students_count, sessions_count, last_session };
+    } catch (_e) {
+      // On failure, return class with safe defaults
+      return {
+        ...cls,
+        students_count: 0,
+        sessions_count: 0,
+        last_session: null,
+      };
+    }
+  };
+
+  // Load classes and active sessions
   useEffect(() => {
-    const loadClasses = async () => {
+    const loadData = async () => {
       try {
+        // Load classes
         const apiClasses = await facultyAPI.getClasses();
-        setClasses(apiClasses);
+        // Enrich each class with dynamic stats in parallel
+        const enriched = await Promise.all(
+          (apiClasses || []).map((c) => enrichClassWithStats(c))
+        );
+        setClasses(enriched);
+
+        // Load active sessions from backend to sync state
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        if (user.user_id) {
+          const API_URL =
+            import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+          const res = await fetch(
+            `${API_URL}/api/faculty/sessions/active?faculty_id=${user.user_id}`
+          );
+          if (res.ok) {
+            const activeSessionsData = await res.json();
+            const sessionMap = {};
+            activeSessionsData.forEach((session) => {
+              sessionMap[session.class_id] = {
+                status: "active",
+                sessionId: session.session_id,
+                generatedCode: session.generated_code,
+                startTime: session.start_time,
+              };
+            });
+            setActiveSessions(sessionMap);
+          }
+        }
       } catch (error) {
         toast({
           title: "Error",
@@ -180,8 +244,11 @@ const FacultyDashboard = () => {
         setClasses([]);
       }
     };
-    loadClasses();
-  }, []);
+    loadData();
+  }, [toast]);
+
+  // Merge context sessions with loaded active sessions
+  const mergedSessions = { ...activeSessions, ...sessions };
 
   const handleCreateClass = async () => {
     if (!newClass.name.trim()) {
@@ -194,7 +261,9 @@ const FacultyDashboard = () => {
     }
     try {
       const createdClass = await facultyAPI.createClass(newClass.name);
-      setClasses([...classes, createdClass]);
+      // Enrich the newly created class with stats (will likely be zeros initially)
+      const enriched = await enrichClassWithStats(createdClass);
+      setClasses([...classes, enriched]);
       setNewClass({ name: "", joinCode: "" });
       setIsCreateDialogOpen(false);
       toast({
@@ -251,6 +320,55 @@ const FacultyDashboard = () => {
       toast({
         title: "Error",
         description: error.message || "Failed to end session",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // NEW: Handle navigation to active attendance session
+  const handleGoToAttendance = async (classItem) => {
+    try {
+      // Always fetch from backend to ensure we have the latest active session
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const res = await fetch(
+        `${API_URL}/class/${classItem.class_id}/active-session`
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch active session");
+      }
+
+      const data = await res.json();
+
+      if (data.session_id) {
+        // Update context with the active session info
+        if (!sessions[classItem.class_id]?.sessionId) {
+          const newSessions = {
+            ...sessions,
+            [classItem.class_id]: {
+              status: "active",
+              sessionId: data.session_id,
+              generatedCode: data.generated_code,
+              startTime: data.start_time,
+            },
+          };
+          // Update sessions context (this assumes setSessions is accessible)
+          // If not, we can still navigate - the Attendance page will fetch the data
+        }
+
+        navigate(
+          `/attendance/${classItem.class_id}?sessionId=${data.session_id}`
+        );
+      } else {
+        throw new Error("No active session found for this class");
+      }
+    } catch (error) {
+      console.error("Navigation error:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message ||
+          "Failed to navigate to attendance. Please try starting a new session.",
         variant: "destructive",
       });
     }
@@ -408,6 +526,7 @@ const FacultyDashboard = () => {
                   onDelete={handleDeleteClass}
                   onEndSession={handleEndSession}
                   onStartSession={handleStartSession}
+                  onGoToAttendance={handleGoToAttendance}
                 />
               ))}
             </div>
@@ -428,6 +547,7 @@ const FacultyDashboard = () => {
                   onDelete={handleDeleteClass}
                   onEndSession={handleEndSession}
                   onStartSession={handleStartSession}
+                  onGoToAttendance={handleGoToAttendance}
                 />
               ))}
             </div>
@@ -448,6 +568,7 @@ const FacultyDashboard = () => {
                   onDelete={handleDeleteClass}
                   onEndSession={handleEndSession}
                   onStartSession={handleStartSession}
+                  onGoToAttendance={handleGoToAttendance}
                 />
               ))}
             </div>
@@ -477,9 +598,7 @@ const FacultyDashboard = () => {
               View attendance records and session details for this class
             </DialogDescription>
           </DialogHeader>
-          {selectedClass && (
-            <ClassDetails classItem={selectedClass} />
-          )}
+          {selectedClass && <ClassDetails classItem={selectedClass} />}
         </DialogContent>
       </Dialog>
     </div>

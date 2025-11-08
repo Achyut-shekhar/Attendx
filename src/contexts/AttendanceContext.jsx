@@ -9,12 +9,51 @@ export const AttendanceProvider = ({ children }) => {
   const [sessions, setSessions] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // Safe user loader (id only)
+  const getUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user")) || null;
+    } catch {
+      return null;
+    }
+  };
+
   // Helper function to save sessions to localStorage
   const saveToLocalStorage = (sessionData) => {
     try {
       localStorage.setItem("attendance_sessions", JSON.stringify(sessionData));
     } catch (error) {
       console.error("Failed to save sessions to localStorage:", error);
+    }
+  };
+
+  // Internal: reload active sessions from backend
+  const reloadActiveSessions = async () => {
+    try {
+      const user = getUser();
+      if (!user?.user_id) return;
+
+      const { data } = await api.get("/faculty/sessions/active", {
+        params: { faculty_id: user.user_id },
+      });
+
+      const activeSessions = data.reduce((acc, session) => {
+        acc[session.class_id] = {
+          status: "active",
+          sessionId: session.session_id,
+          generatedCode: session.generated_code, // may be undefined; ok
+          startTime: session.start_time,
+        };
+        return acc;
+      }, {});
+      setSessions(activeSessions);
+      // persist
+      saveToLocalStorage(activeSessions);
+    } catch (error) {
+      console.error(
+        "Failed to load active sessions:",
+        error.response?.data || error.message
+      );
     }
   };
 
@@ -29,17 +68,7 @@ export const AttendanceProvider = ({ children }) => {
           return;
         }
 
-        const response = await api.get("/faculty/sessions/active");
-        const activeSessions = response.data.reduce((acc, session) => {
-          acc[session.class_id] = {
-            status: "active",
-            sessionId: session.session_id,
-            generatedCode: session.generated_code,
-            startTime: session.start_time,
-          };
-          return acc;
-        }, {});
-        setSessions(activeSessions);
+        await reloadActiveSessions();
       } catch (error) {
         console.error(
           "Failed to load active sessions:",
@@ -88,8 +117,8 @@ export const AttendanceProvider = ({ children }) => {
     try {
       const currentSession = sessions[classId];
       if (currentSession?.sessionId) {
-        // Update session in database
-        await api.patch(
+        // Update session in database (standardize to PUT)
+        await api.put(
           `/faculty/classes/${classId}/sessions/${currentSession.sessionId}/end`
         );
       }
@@ -101,6 +130,9 @@ export const AttendanceProvider = ({ children }) => {
       };
       setSessions(newSessions);
       saveToLocalStorage(newSessions);
+
+      // Refresh active sessions from backend to keep in sync
+      await reloadActiveSessions();
     } catch (error) {
       console.error("Failed to end session:", error);
       throw error;

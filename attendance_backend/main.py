@@ -513,32 +513,56 @@ def get_enrolled_classes(student_id: int):
 @app.post("/api/student/classes/join")
 def join_class(join_data: JoinClassRequest):
     try:
+        print(f"[JOIN] Received: student_id={join_data.student_id}, join_code={join_data.join_code}")
+        
         find_sql = text("SELECT class_id FROM classes WHERE join_code = :join_code")
+        check_enroll = text(
+            "SELECT 1 FROM class_enrollments WHERE student_id = :student_id AND class_id = :class_id"
+        )
         enroll_sql = text(
             """
-            INSERT INTO class_enrollments (student_id, class_id, enrolled_at)
-            VALUES (:student_id, :class_id, NOW())
-            ON CONFLICT DO NOTHING
-            RETURNING enrollment_id
+            INSERT INTO class_enrollments (student_id, class_id)
+            VALUES (:student_id, :class_id)
             """
         )
         with engine.connect() as conn:
+            print(f"[JOIN] Looking for class with join_code={join_data.join_code}")
             class_row = conn.execute(
                 find_sql, {"join_code": join_data.join_code}
             ).fetchone()
             if not class_row:
+                print(f"[JOIN] No class found with code={join_data.join_code}")
                 raise HTTPException(status_code=404, detail="Invalid join code")
             class_id = class_row[0]
-            res = conn.execute(
+            print(f"[JOIN] Found class_id={class_id}")
+            
+            # Check if already enrolled
+            print(f"[JOIN] Checking if student {join_data.student_id} already enrolled in class {class_id}")
+            already_enrolled = conn.execute(
+                check_enroll,
+                {"student_id": join_data.student_id, "class_id": class_id},
+            ).fetchone()
+            if already_enrolled:
+                print(f"[JOIN] Student already enrolled")
+                conn.commit()
+                return {"message": "Already enrolled", "class_id": class_id}
+            
+            # Enroll the student
+            print(f"[JOIN] Enrolling student {join_data.student_id} in class {class_id}")
+            conn.execute(
                 enroll_sql,
                 {"student_id": join_data.student_id, "class_id": class_id},
             )
             conn.commit()
-            if res.rowcount == 0:
-                return {"message": "Already enrolled"}
+            print(f"[JOIN] Successfully enrolled!")
             return {"message": "Successfully joined class", "class_id": class_id}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[JOIN] ERROR: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database error: {type(e).__name__}: {str(e)}")
 
 
 # Student submits code (PRESENT)
@@ -793,5 +817,31 @@ def get_session_attendance_flat(session_id: int):
                 "absent": sum(1 for r in all_rows if r["status"] == "ABSENT"),
             }
             return {"session": sess, "records": all_rows, "totals": totals}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- NEW: sessions stats per class (authoritative count and last session time) ---
+@app.get("/api/faculty/classes/{class_id}/sessions/stats")
+def get_class_sessions_stats(class_id: int):
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) AS sessions_count,
+                           MAX(start_time) AS last_start
+                    FROM attendance_sessions
+                    WHERE class_id = :cid
+                    """
+                ),
+                {"cid": class_id},
+            ).fetchone()
+
+            sessions_count = int(row._mapping["sessions_count"]) if row else 0
+            last_session = (
+                row._mapping["last_start"].isoformat() if row and row._mapping["last_start"] else None
+            )
+            return {"sessions_count": sessions_count, "last_session": last_session}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
