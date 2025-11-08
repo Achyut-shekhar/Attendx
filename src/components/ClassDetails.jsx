@@ -1,6 +1,11 @@
 import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useState, useEffect, useRef } from "react";
 import { facultyAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -15,196 +20,230 @@ import { Badge } from "@/components/ui/badge";
 
 const ClassDetails = ({ classItem }) => {
   const { toast } = useToast();
+
   const [date, setDate] = useState(new Date());
+  const [month, setMonth] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  );
+
+  const selectedDate = date.toLocaleDateString("en-CA");
+
+  const [sessions, setSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
+
+  const [rows, setRows] = useState([]);
+  const [totals, setTotals] = useState({ present: 0, late: 0, absent: 0 });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [allAttendanceRecords, setAllAttendanceRecords] = useState([]);
-  const [dailyData, setDailyData] = useState(null);
 
-  const selectedDate = date.toISOString().split("T")[0];
+  const pollRef = useRef(null);
 
-  useEffect(() => {
-    const fetchClassDetails = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await facultyAPI.getClassDetails(classItem.class_id);
-        setAllAttendanceRecords(data || []);
+  /* ---------------------------------------------------
+     STEP 1 — Load ALL sessions on the selected date
+  --------------------------------------------------- */
+  const loadSessions = async () => {
+    try {
+      const list = await facultyAPI.getSessionsByDate(
+        classItem.class_id,
+        selectedDate
+      );
 
-        // Process data for selected date
-        processDateData(data, selectedDate);
-      } catch (error) {
-        setError(error.message || "Failed to load class details");
-        toast({
-          title: "Error",
-          description: error.message || "Failed to load class details",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+      setSessions(list);
+
+      if (list.length > 0) {
+        const latest = list[list.length - 1].session_id;
+        setSelectedSession(latest); // auto-select latest
+      } else {
+        setSelectedSession(null);
+        setRows([]);
+        setTotals({ present: 0, late: 0, absent: 0 });
       }
-    };
-
-    fetchClassDetails();
-  }, [classItem.class_id, toast]);
-
-  // Update daily data when date changes
-  useEffect(() => {
-    if (allAttendanceRecords.length > 0) {
-      processDateData(allAttendanceRecords, selectedDate);
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: "Failed to load sessions.",
+        variant: "destructive",
+      });
     }
-  }, [selectedDate, allAttendanceRecords]);
-
-  const processDateData = (records, dateStr) => {
-    // Filter records for the selected date
-    const dateRecords = records.filter((record) => {
-      if (!record.marked_at) return false;
-      const recordDate = new Date(record.marked_at).toISOString().split("T")[0];
-      return recordDate === dateStr;
-    });
-
-    if (dateRecords.length === 0) {
-      setDailyData(null);
-      return;
-    }
-
-    // Count present and absent
-    const presentCount = dateRecords.filter(
-      (r) => r.attendance_status === "PRESENT"
-    ).length;
-    const absentCount = dateRecords.filter(
-      (r) => !r.attendance_status || r.attendance_status !== "PRESENT"
-    ).length;
-
-    // Prepare absentee list
-    const absentees = dateRecords
-      .filter((r) => !r.attendance_status || r.attendance_status !== "PRESENT")
-      .map((r, idx) => ({
-        id: idx,
-        name: r.student_name || "Unknown",
-      }));
-
-    setDailyData({
-      presentCount,
-      absentCount,
-      absentees,
-      allRecords: dateRecords,
-    });
   };
+
+  /* ---------------------------------------------------
+     STEP 2 — Load attendance for ONE specific session
+  --------------------------------------------------- */
+  const loadSessionAttendance = async (sessionId, silent = false) => {
+    if (!sessionId) return;
+
+    try {
+      if (!silent) setLoading(true);
+
+      const data = await facultyAPI.getSessionAttendanceFlat(sessionId);
+
+      const recs = Array.isArray(data?.records) ? data.records : [];
+
+      const present = recs.filter((x) => x.status === "PRESENT").length;
+      const late = recs.filter((x) => x.status === "LATE").length;
+      const absent = recs.filter((x) => x.status === "ABSENT").length;
+
+      setTotals({ present, late, absent });
+      setRows(
+        recs.sort((a, b) => a.student_name.localeCompare(b.student_name))
+      );
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to load attendance.",
+        variant: "destructive",
+      });
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  /* ---------------------------------------------------
+     Load sessions whenever date changes
+  --------------------------------------------------- */
+  useEffect(() => {
+    loadSessions();
+  }, [selectedDate]);
+
+  /* ---------------------------------------------------
+     Load attendance whenever selectedSession changes
+  --------------------------------------------------- */
+  useEffect(() => {
+    if (!selectedSession) return;
+
+    loadSessionAttendance(selectedSession, false);
+
+    if (pollRef.current) clearInterval(pollRef.current);
+
+    // Live update every 2s
+    pollRef.current = setInterval(() => {
+      loadSessionAttendance(selectedSession, true);
+    }, 2000);
+
+    return () => pollRef.current && clearInterval(pollRef.current);
+  }, [selectedSession]);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
-        Loading...
+        Loading…
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-red-500 text-center min-h-[300px]">{error}</div>
     );
   }
 
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">
-        {classItem.class_name} - Attendance Details
+        {classItem.class_name} Attendance
       </h2>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Calendar */}
         <div className="md:col-span-1 flex justify-center">
-          <div className="max-w-xs">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              className="rounded-md border"
-            />
-          </div>
+          <Calendar
+            mode="single"
+            month={month}
+            onMonthChange={setMonth}
+            selected={date}
+            onSelect={(d) => {
+              if (!d) return;
+              setDate(d);
+              setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+            }}
+            className="rounded-md border"
+          />
         </div>
+
+        {/* Right Panel */}
         <div className="md:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Attendance for {selectedDate}</CardTitle>
             </CardHeader>
+
             <CardContent>
-              {dailyData ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <p className="text-sm text-green-600">Present</p>
-                      <p className="text-2xl font-bold text-green-700">
-                        {dailyData.presentCount}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-red-50 rounded-lg">
-                      <p className="text-sm text-red-600">Absent</p>
-                      <p className="text-2xl font-bold text-red-700">
-                        {dailyData.absentCount}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Attendance Records Table */}
-                  <div className="mt-6">
-                    <h3 className="font-bold mb-3">Attendance Records</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Student Name</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Marked At</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {dailyData.allRecords.map((record, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>
-                              {record.student_name || "N/A"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  record.attendance_status === "PRESENT"
-                                    ? "default"
-                                    : "destructive"
-                                }
-                              >
-                                {record.attendance_status || "ABSENT"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {new Date(record.marked_at).toLocaleTimeString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  {/* Absentees List */}
-                  {dailyData.absentCount > 0 && (
-                    <div>
-                      <h3 className="font-bold mt-4">Absentees:</h3>
-                      <ul className="mt-2 space-y-1">
-                        {dailyData.absentees.map((student) => (
-                          <li
-                            key={student.id}
-                            className="flex items-center space-x-2 text-sm text-red-600"
-                          >
-                            <span>•</span>
-                            <span>{student.name}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+              {/* Session Dropdown */}
+              {sessions.length > 0 && (
+                <div className="mb-4">
+                  <label className="text-sm font-medium">Select Session</label>
+                  <select
+                    className="border rounded-md w-full p-2 mt-1"
+                    value={selectedSession || ""}
+                    onChange={(e) => setSelectedSession(Number(e.target.value))}
+                  >
+                    {sessions.map((s) => (
+                      <option key={s.session_id} value={s.session_id}>
+                        Session {s.session_id} at{" "}
+                        {new Date(s.start_time).toLocaleTimeString()}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                <p className="text-center text-muted-foreground">
-                  No attendance data for this date.
-                </p>
               )}
+
+              {/* Totals */}
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <p className="text-sm text-green-600">Present</p>
+                  <p className="text-3xl font-bold text-green-700">
+                    {totals.present}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-yellow-50 rounded-lg">
+                  <p className="text-sm text-yellow-700">Late</p>
+                  <p className="text-3xl font-bold text-yellow-800">
+                    {totals.late}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-red-50 rounded-lg">
+                  <p className="text-sm text-red-600">Absent</p>
+                  <p className="text-3xl font-bold text-red-700">
+                    {totals.absent}
+                  </p>
+                </div>
+              </div>
+
+              {/* Table */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {rows.map((r) => (
+                    <TableRow key={r.student_id}>
+                      <TableCell>{r.student_name}</TableCell>
+
+                      <TableCell>
+                        <Badge
+                          variant={
+                            r.status === "PRESENT"
+                              ? "default"
+                              : r.status === "LATE"
+                              ? "secondary"
+                              : "destructive"
+                          }
+                        >
+                          {r.status}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        {r.marked_at
+                          ? new Date(r.marked_at).toLocaleTimeString()
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </div>

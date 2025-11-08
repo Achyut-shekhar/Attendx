@@ -1,59 +1,93 @@
-import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { useAttendance } from "@/contexts/AttendanceContext";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CodeGeneration from "../components/attendance/CodeGeneration";
-import LocationCheck from "../components/attendance/LocationCheck";
-import ManualAttendance from "../components/attendance/ManualAttendance";
+
+import CodeGeneration from "@/components/attendance/CodeGeneration";
+import LocationCheck from "@/components/attendance/LocationCheck";
+import ManualAttendance from "@/components/attendance/ManualAttendance";
+
+import { attendanceApi } from "@/api/attendance";
+import { classesAPI } from "@/api/classes";
 
 const Attendance = () => {
   const { classId } = useParams();
-  const { startSession, getSessionStatus } = useAttendance();
-  const [activeMethod, setActiveMethod] = useState("manual");
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get("sessionId");
 
-  // Only start session on initial mount or when method is explicitly changed by user
+  const [activeMethod, setActiveMethod] = useState("code");
+
+  // ✅ Real-time page data
+  const [session, setSession] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+
+  // ✅ AUTO REFRESH — Every 3 seconds
   useEffect(() => {
-    const currentStatus = getSessionStatus(classId);
-    if (classId && !currentStatus) {
-      startSession(classId, "manual"); // Start with manual by default
-    }
-  }, [classId]); // Only depend on classId changes
+    if (!classId || !sessionId) return;
 
-  // Mock class data (for local preview)
-  const classes = {
-    1: { name: "Computer Science 101" },
-    2: { name: "Database Systems" },
-    11: { name: "Mathematics 101" },
-  };
+    const loadData = async () => {
+      try {
+        // ✅ 1. Session details (code + status)
+        const s = await attendanceApi.getSessionById(sessionId);
+        setSession(s);
 
-  const className = classes[classId]?.name || "New Course";
+        // ✅ 2. Enrolled students
+        const st = await classesAPI.getClassStudents(classId);
+        setStudents(st);
+
+        // ✅ 3. Attendance records (correct API)
+        const att = await classesAPI.getClassAttendance(classId);
+        setAttendance(att);
+
+      } catch (err) {
+        console.log("Live refresh error:", err);
+      }
+    };
+
+    loadData(); // run immediately
+    const interval = setInterval(loadData, 3000);
+
+    return () => clearInterval(interval);
+  }, [classId, sessionId]);
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-2">
-        Take Attendance for {className}
-      </h1>
-      <p className="text-muted-foreground mb-4">Class ID: {classId}</p>
+      <h1 className="text-2xl font-bold mb-2">Take Attendance</h1>
+      <p className="text-muted-foreground mb-4">
+        Class ID: {classId} • Session ID: {sessionId || "—"}
+      </p>
 
-      <Tabs
-        defaultValue="manual"
-        value={activeMethod}
-        onValueChange={(method) => setActiveMethod(method)}
-      >
+      <Tabs value={activeMethod} onValueChange={setActiveMethod}>
         <TabsList>
           <TabsTrigger value="manual">Manual</TabsTrigger>
           <TabsTrigger value="code">Code Generation</TabsTrigger>
           <TabsTrigger value="location">Location Check</TabsTrigger>
         </TabsList>
 
+        {/* ✅ Manual Attendance */}
         <TabsContent value="manual">
-          <ManualAttendance classId={classId} />
+          <ManualAttendance
+            classId={classId}
+            sessionId={sessionId}
+            students={students}
+            attendance={attendance}
+          />
         </TabsContent>
+
+        {/* ✅ Code Attendance */}
         <TabsContent value="code">
-          <CodeGeneration classId={classId} />
+          <CodeGeneration
+            classId={classId}
+            sessionId={sessionId}
+            session={session}
+            students={students}
+            attendance={attendance}
+          />
         </TabsContent>
+
+        {/* ✅ Location Based Attendance */}
         <TabsContent value="location">
-          <LocationCheck classId={classId} />
+          <LocationCheck classId={classId} sessionId={sessionId} />
         </TabsContent>
       </Tabs>
     </div>

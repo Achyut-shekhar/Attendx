@@ -166,7 +166,6 @@ const FacultyDashboard = () => {
   const [selectedClass, setSelectedClass] = useState(null);
   const [endedClassIds, setEndedClassIds] = useState([]);
 
-  // 🟢 Load classes from API
   useEffect(() => {
     const loadClasses = async () => {
       try {
@@ -184,7 +183,6 @@ const FacultyDashboard = () => {
     loadClasses();
   }, []);
 
-  // 🟢 Create new class
   const handleCreateClass = async () => {
     if (!newClass.name.trim()) {
       toast({
@@ -212,17 +210,23 @@ const FacultyDashboard = () => {
     }
   };
 
-  // 🟢 Start session
+  // IMPORTANT: Option A flow — no popup here; just navigate with sessionId
   const handleStartSession = async (classItem) => {
     try {
-      console.log("Starting session for class:", classItem);
       const session = await facultyAPI.startSession(classItem.class_id);
+      const sessionId = session.session_id;
+      if (!sessionId) throw new Error("Invalid session response");
+
+      // (Optional) keep local context status but don't generate any code here
       startSession(classItem.class_id);
+
+      // Navigate to attendance page with the sessionId — popup will be on the Code tab
+      navigate(`/attendance/${classItem.class_id}?sessionId=${sessionId}`);
+
       toast({
         title: "Session Started",
-        description: `${classItem.class_name} session is now active.`,
+        description: `${classItem.class_name} session is active.`,
       });
-      navigate(`/attendance/${classItem.class_id}?sessionId=${session.id}`);
     } catch (error) {
       toast({
         title: "Error",
@@ -232,7 +236,6 @@ const FacultyDashboard = () => {
     }
   };
 
-  // 🟢 End session
   const handleEndSession = async (classItem) => {
     try {
       const activeSession = sessions[classItem.class_id];
@@ -253,7 +256,6 @@ const FacultyDashboard = () => {
     }
   };
 
-  // 🟢 Delete class
   const handleDeleteClass = async (classItem) => {
     try {
       await facultyAPI.deleteClass(classItem.class_id);
@@ -279,7 +281,6 @@ const FacultyDashboard = () => {
     setDetailsOpen(true);
   };
 
-  // 🟢 Filtered and categorized classes
   const filteredClasses = classes.filter((cls) =>
     cls.class_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -335,6 +336,7 @@ const FacultyDashboard = () => {
                   Add a new class to your dashboard
                 </DialogDescription>
               </DialogHeader>
+
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="className">Class Name</Label>
@@ -359,6 +361,7 @@ const FacultyDashboard = () => {
                   />
                 </div>
               </div>
+
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
@@ -391,7 +394,7 @@ const FacultyDashboard = () => {
           </Button>
         </div>
 
-        {/* Active */}
+        {/* Active Sessions */}
         {activeClasses.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Active Sessions</h2>
@@ -411,7 +414,7 @@ const FacultyDashboard = () => {
           </div>
         )}
 
-        {/* Ended */}
+        {/* Ended Sessions */}
         {endedClasses.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Ended Sessions</h2>
@@ -431,7 +434,7 @@ const FacultyDashboard = () => {
           </div>
         )}
 
-        {/* Scheduled */}
+        {/* Your Classes */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Your Classes</h2>
           {scheduledClasses.length > 0 ? (
@@ -474,7 +477,9 @@ const FacultyDashboard = () => {
               View attendance records and session details for this class
             </DialogDescription>
           </DialogHeader>
-          {selectedClass && <ClassDetails classItem={selectedClass} />}
+          {selectedClass && (
+            <ClassDetails classItem={selectedClass} />
+          )}
         </DialogContent>
       </Dialog>
     </div>

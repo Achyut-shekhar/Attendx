@@ -1,70 +1,70 @@
-// api/attendance.js
+// src/api/attendance.js
+
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export const attendanceApi = {
-  async startSession(classId, token) {
-    const response = await fetch(`${API_URL}/attendance/start`, {
+  // STUDENT: Submit attendance using generated code
+  async submitAttendanceCode(studentId, code) {
+    const res = await fetch(`${API_URL}/attendance/submit-code`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ class_id: classId }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: studentId, code }),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to start attendance session");
-    }
-
-    return response.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to submit attendance");
+    return data;
   },
 
-  async markAttendance(sessionId, code, token) {
-    const response = await fetch(`${API_URL}/attendance/mark`, {
+  // FACULTY: Start session
+  async startSession(classId) {
+    const res = await fetch(`${API_URL}/api/faculty/classes/${classId}/sessions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ session_id: sessionId, code }),
+      headers: { "Content-Type": "application/json" },
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to mark attendance");
-    }
-
-    return response.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to start session");
+    return data;
   },
 
-  async closeSession(sessionId, token) {
-    const response = await fetch(`${API_URL}/attendance/${sessionId}/close`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to close session");
-    }
-
-    return response.json();
+  // FACULTY: End session
+  async closeSession(classId, sessionId) {
+    const res = await fetch(
+      `${API_URL}/api/faculty/classes/${classId}/sessions/${sessionId}/end`,
+      { method: "PUT", headers: { "Content-Type": "application/json" } }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to close session");
+    return data;
   },
 
-  async getAttendanceReport(classId, token) {
-    const response = await fetch(`${API_URL}/attendance/report/${classId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  // FETCH SESSION by ID
+  async getSessionById(sessionId) {
+    const res = await fetch(`${API_URL}/api/faculty/sessions/${sessionId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to fetch session");
+    return data;
+  },
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch attendance report");
-    }
+  // ✅ CORRECT attendance list endpoint
+  async getAttendanceForClass(classId) {
+    const res = await fetch(`${API_URL}/api/faculty/classes/${classId}/attendance`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to fetch attendance");
+    return data;
+  },
 
-    return response.json();
+  // ✅ NEW: Manual attendance mark
+  async markManualAttendance(sessionId, studentId) {
+    const res = await fetch(
+      `${API_URL}/api/faculty/sessions/${sessionId}/attendance/manual`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, student_id: studentId }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed manual mark");
+    return data;
   },
 };

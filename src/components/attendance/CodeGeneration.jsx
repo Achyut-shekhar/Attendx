@@ -1,189 +1,126 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useAttendance } from "@/contexts/AttendanceContext";
 import { useToast } from "@/components/ui/use-toast";
-import { facultyAPI, studentAPI } from "@/services/api";
-import { useNavigate } from "react-router-dom";
 
-const CodeGeneration = ({ classId }) => {
-  const [code, setCode] = useState("");
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [attendanceStatus, setAttendanceStatus] = useState({});
-  const { getCurrentSession, endSession } = useAttendance();
+/**
+ * Props:
+ * - classId, sessionId (strings from route)
+ * - session: { generated_code, status, session_id, ... }
+ * - students: [{ user_id, name, email }]
+ * - attendance: [{ session_id, student_id?, student_name, attendance_status, marked_at }, ...]
+ *
+ * NOTE: We don't fetch here anymore — Attendance.jsx already refreshes
+ * all 3 blocks (session, students, attendance) every 3 seconds.
+ */
+export default function CodeGeneration({ classId, sessionId, session, students = [], attendance = [] }) {
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const code = session?.generated_code || "";
+  const isClosed = session?.status === "CLOSED";
+  const sid = Number(sessionId);
 
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const data = await facultyAPI.getClassStudents(classId);
-        setStudents(data);
-        const statusMap = {};
-        data.forEach((s) => {
-          statusMap[s.user_id] = "Absent";
-        });
-        setAttendanceStatus(statusMap);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching students:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch students",
-          variant: "destructive",
-        });
-        setLoading(false);
+  // Build a quick lookup to know who is PRESENT for THIS session
+  const presentSet = useMemo(() => {
+    const set = new Set();
+    for (const r of attendance) {
+      if (Number(r.session_id) !== sid) continue;
+      if (r.attendance_status === "PRESENT") {
+        // Prefer student_id if backend provides it; fall back to name-safe key
+        if (r.student_id != null) set.add(`id:${r.student_id}`);
+        else if (r.student_name) set.add(`name:${r.student_name}`);
       }
-    };
+    }
+    return set;
+  }, [attendance, sid]);
 
-    fetchStudents();
-  }, [classId, toast]);
-
-  const generateCode = async () => {
-    setIsGenerating(true);
-    const session = getCurrentSession(classId);
-    const codeToDisplay =
-      session?.generatedCode ||
-      Math.random().toString(36).substring(2, 8).toUpperCase();
-    setCode(codeToDisplay);
-
-    // Simulate students marking attendance
-    setTimeout(() => {
-      const updatedStatus = { ...attendanceStatus };
-      students.forEach((s) => {
-        if (Math.random() > 0.3) {
-          updatedStatus[s.user_id] = "Present";
-        }
-      });
-      setAttendanceStatus(updatedStatus);
-      setIsGenerating(false);
-    }, 3000);
+  const isPresent = (student) => {
+    // Try id match first; then name match (for older backend response shape)
+    if (presentSet.has(`id:${student.user_id}`)) return true;
+    if (presentSet.has(`name:${student.name}`)) return true;
+    return false;
   };
 
-  const handleEndSession = async () => {
-    try {
-      const session = getCurrentSession(classId);
-      if (!session?.sessionId) {
-        throw new Error("No active session found");
-      }
-
-      // Mark attendance for all "Present" students
-      for (const [studentId, status] of Object.entries(attendanceStatus)) {
-        if (status === "Present") {
-          await studentAPI.markAttendance({
-            session_id: session.sessionId,
-            student_id: parseInt(studentId),
-          });
-        }
-      }
-
-      const presentCount = Object.values(attendanceStatus).filter(
-        (s) => s === "Present"
-      ).length;
-
+  const showPopup = () => {
+    if (!code) {
       toast({
-        title: "Session Ended",
-        description: `${presentCount} students marked as present.`,
-      });
-
-      endSession(classId);
-      navigate("/faculty-dashboard");
-    } catch (error) {
-      console.error("Error ending session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to end session",
+        title: "No code",
+        description: "Start a session from the Faculty Dashboard first.",
         variant: "destructive",
       });
+      return;
     }
+    alert(`Share this code with students:\n\n${code}`);
   };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Code Generation Attendance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>Loading students...</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Code Generation Attendance</CardTitle>
         <CardDescription>
-          Generate a code for students to mark their attendance.
+          Shows the SAME code created when you started the session. Button is disabled after ending the session.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex gap-4 items-center mb-4">
-          <Button onClick={generateCode} disabled={isGenerating || code}>
-            {isGenerating ? "Generating..." : "Generate Code"}
+      <CardContent className="space-y-4">
+        <div className="flex gap-3 items-center">
+          <Button onClick={showPopup} disabled={!code || isClosed}>
+            Show Code Popup
           </Button>
-          {code && <p className="text-2xl font-bold tracking-widest">{code}</p>}
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (code) {
+                navigator.clipboard.writeText(code);
+                toast({ title: "Copied", description: "Code copied to clipboard." });
+              }
+            }}
+            disabled={!code || isClosed}
+          >
+            Copy Code
+          </Button>
+          <div className="text-2xl font-bold tracking-widest">
+            {code || "—"}
+          </div>
+          {isClosed && <Badge variant="destructive">Session Closed</Badge>}
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {students.map((student) => (
-              <TableRow key={student.user_id}>
-                <TableCell>{student.name}</TableCell>
-                <TableCell>{student.email}</TableCell>
-                <TableCell className="text-right">
-                  <Badge
-                    variant={
-                      attendanceStatus[student.user_id] === "Present"
-                        ? "default"
-                        : "destructive"
-                    }
-                  >
-                    {attendanceStatus[student.user_id]}
-                  </Badge>
-                </TableCell>
+        <div className="border-t pt-4">
+          <div className="text-sm text-muted-foreground mb-2">Enrolled Students</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="text-right">Status (this session)</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {code && (
-          <Button
-            onClick={handleEndSession}
-            variant="destructive"
-            className="mt-4"
-          >
-            End Session
-          </Button>
-        )}
+            </TableHeader>
+            <TableBody>
+              {students.map((s) => {
+                const present = isPresent(s);
+                return (
+                  <TableRow key={s.user_id}>
+                    <TableCell>{s.name}</TableCell>
+                    <TableCell>{s.email}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={present ? "default" : "outline"}>
+                        {present ? "PRESENT" : "—"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {students.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    No students enrolled in this class yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
-};
-
-export default CodeGeneration;
+}
