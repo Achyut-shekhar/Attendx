@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, LogOut } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 import CodeGeneration from "@/components/attendance/CodeGeneration";
@@ -27,7 +27,6 @@ const Attendance = () => {
   const [session, setSession] = useState(null);
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState([]);
-  const [isEndingSession, setIsEndingSession] = useState(false);
 
   // ✅ AUTO REFRESH — Every 3 seconds
   useEffect(() => {
@@ -46,7 +45,6 @@ const Attendance = () => {
         // ✅ 3. Attendance records (correct API)
         const att = await classesAPI.getClassAttendance(classId);
         setAttendance(att);
-
       } catch (err) {
         console.log("Live refresh error:", err);
       }
@@ -57,34 +55,6 @@ const Attendance = () => {
 
     return () => clearInterval(interval);
   }, [classId, sessionId]);
-
-  // ✅ Handle End Session
-  const handleEndSession = async () => {
-    if (!window.confirm("Are you sure you want to end this session? You can still view records, but no more attendance will be marked.")) {
-      return;
-    }
-
-    setIsEndingSession(true);
-    try {
-      await facultyAPI.endSession(Number(classId), Number(sessionId));
-      toast({
-        title: "Session Ended",
-        description: "The attendance session has been ended successfully.",
-      });
-      // Stay on page to show results, but disable further marking
-      setTimeout(() => {
-        navigate("/faculty-dashboard");
-      }, 2000);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to end session",
-        variant: "destructive",
-      });
-    } finally {
-      setIsEndingSession(false);
-    }
-  };
 
   return (
     <div className="container mx-auto p-4">
@@ -103,16 +73,6 @@ const Attendance = () => {
             </Button>
             <h1 className="text-2xl font-bold">Take Attendance</h1>
           </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleEndSession}
-            disabled={isEndingSession}
-            className="gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            {isEndingSession ? "Ending..." : "End Session"}
-          </Button>
         </div>
         <p className="text-muted-foreground">
           Class ID: {classId} • Session ID: {sessionId || "—"}
@@ -129,7 +89,9 @@ const Attendance = () => {
             </div>
             <div>
               <span className="font-semibold">Started:</span>
-              <p className="text-sm">{new Date(session.start_time).toLocaleString()}</p>
+              <p className="text-sm">
+                {new Date(session.start_time).toLocaleString()}
+              </p>
             </div>
             <div>
               <span className="font-semibold">Students:</span>
@@ -137,7 +99,14 @@ const Attendance = () => {
             </div>
             <div>
               <span className="font-semibold">Marked:</span>
-              <p className="text-sm">{attendance.filter(a => a.session_id == sessionId && a.status === "PRESENT").length} present</p>
+              <p className="text-sm">
+                {
+                  attendance.filter(
+                    (a) => a.session_id == sessionId && a.status === "PRESENT"
+                  ).length
+                }{" "}
+                present
+              </p>
             </div>
           </div>
         </Card>

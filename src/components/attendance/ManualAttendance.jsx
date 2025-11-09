@@ -89,12 +89,22 @@ const ManualAttendance = ({
     const sid = Number(sessionId);
     const willCheck = !!nextChecked; // true => mark PRESENT, false => mark ABSENT
 
+    console.log(
+      `[ManualAttendance] toggleImmediate: student=${id}, willCheck=${willCheck}`
+    );
+
     setRowLoading((prev) => ({ ...prev, [id]: true }));
     setLastUserActionAt(Date.now());
     try {
       if (willCheck) {
+        console.log(
+          `[ManualAttendance] Marking PRESENT: session=${sid}, student=${id}`
+        );
         await attendanceApi.markManualAttendance(sid, id, "PRESENT");
       } else {
+        console.log(
+          `[ManualAttendance] Marking ABSENT: session=${sid}, student=${id}`
+        );
         await attendanceApi.unmarkAttendance(sid, id);
       }
       setAttended((prev) =>
@@ -246,9 +256,9 @@ const ManualAttendance = ({
             })}
           </TableBody>
         </Table>
-        <Button onClick={handleSubmit} className="mt-4" disabled={loading}>
-          {loading ? "Updating..." : "Update Attendance"}
-        </Button>
+        <div className="mt-4 text-sm text-muted-foreground text-center">
+          ✓ Attendance is automatically saved when you check/uncheck students
+        </div>
       </CardContent>
     </Card>
   );

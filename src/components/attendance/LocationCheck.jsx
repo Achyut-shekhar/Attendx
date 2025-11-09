@@ -17,18 +17,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { useAttendance } from "@/contexts/AttendanceContext";
-import { facultyAPI, studentAPI } from "@/services/api";
-import { useNavigate } from "react-router-dom";
+import { facultyAPI } from "@/services/api";
 
 const LocationCheck = ({ classId }) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [locationStatus, setLocationStatus] = useState({});
   const [isChecking, setIsChecking] = useState(false);
-  const { getCurrentSession, endSession } = useAttendance();
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -78,44 +74,6 @@ const LocationCheck = ({ classId }) => {
       setLocationStatus(updatedStatus);
       setIsChecking(false);
     }, 3000);
-  };
-
-  const handleEndSession = async () => {
-    try {
-      const session = getCurrentSession(classId);
-      if (!session?.sessionId) {
-        throw new Error("No active session found");
-      }
-
-      // Mark attendance for "Verified" students only
-      for (const [studentId, status] of Object.entries(locationStatus)) {
-        if (status === "Verified") {
-          await studentAPI.markAttendance({
-            session_id: session.sessionId,
-            student_id: parseInt(studentId),
-          });
-        }
-      }
-
-      const verifiedCount = Object.values(locationStatus).filter(
-        (s) => s === "Verified"
-      ).length;
-
-      toast({
-        title: "Session Ended",
-        description: `${verifiedCount} students marked as present based on location.`,
-      });
-
-      endSession(classId);
-      navigate("/faculty-dashboard");
-    } catch (error) {
-      console.error("Error ending session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to end session",
-        variant: "destructive",
-      });
-    }
   };
 
   const getBadgeVariant = (status) => {
@@ -185,13 +143,6 @@ const LocationCheck = ({ classId }) => {
             ))}
           </TableBody>
         </Table>
-        <Button
-          onClick={handleEndSession}
-          variant="destructive"
-          className="mt-4"
-        >
-          End Session
-        </Button>
       </CardContent>
     </Card>
   );

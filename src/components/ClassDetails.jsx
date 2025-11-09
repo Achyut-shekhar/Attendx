@@ -1,10 +1,5 @@
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect, useRef } from "react";
 import { facultyAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
@@ -58,7 +53,7 @@ const ClassDetails = ({ classItem }) => {
         setTotals({ present: 0, late: 0, absent: 0 });
       }
     } catch (err) {
-      console.error(err);
+      console.error("[ClassDetails] Error loading sessions:", err);
       toast({
         title: "Error",
         description: "Failed to load sessions.",

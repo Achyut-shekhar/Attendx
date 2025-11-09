@@ -28,6 +28,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +53,7 @@ const ClassCard = ({
   onEndSession,
   onStartSession,
   onGoToAttendance,
+  startingSession,
 }) => {
   return (
     <Card className="shadow-medium hover:shadow-large transition-all duration-300">
@@ -109,6 +120,7 @@ const ClassCard = ({
             variant={status === "active" ? "default" : "outline"}
             size="sm"
             className="w-full"
+            disabled={startingSession}
             onClick={() => {
               if (status === "active") {
                 // Navigate to active attendance session
@@ -120,7 +132,9 @@ const ClassCard = ({
             }}
           >
             <Play className="h-4 w-4 mr-2" />
-            {status === "active"
+            {startingSession
+              ? "Starting..."
+              : status === "active"
               ? "Go to Attendance"
               : status === "ended"
               ? "Start New Session"
@@ -174,6 +188,9 @@ const FacultyDashboard = () => {
   const [selectedClass, setSelectedClass] = useState(null);
   const [endedClassIds, setEndedClassIds] = useState([]);
   const [activeSessions, setActiveSessions] = useState({});
+  const [startingSession, setStartingSession] = useState(false); // Prevent double-click
+  const [endSessionDialogOpen, setEndSessionDialogOpen] = useState(false);
+  const [classToEnd, setClassToEnd] = useState(null);
 
   // Helper: enrich a class with dynamic stats (students count, sessions count, last session time)
   const enrichClassWithStats = async (cls) => {
@@ -281,9 +298,24 @@ const FacultyDashboard = () => {
 
   // IMPORTANT: Option A flow — no popup here; just navigate with sessionId
   const handleStartSession = async (classItem) => {
+    if (startingSession) {
+      console.log("[FacultyDashboard] Ignoring duplicate start session click");
+      return;
+    }
+
     try {
+      setStartingSession(true);
+      console.log(
+        `[FacultyDashboard] Starting session for class_id=${classItem.class_id}`
+      );
+
       const session = await facultyAPI.startSession(classItem.class_id);
       const sessionId = session.session_id;
+
+      console.log(
+        `[FacultyDashboard] Session created: session_id=${sessionId}`
+      );
+
       if (!sessionId) throw new Error("Invalid session response");
 
       // (Optional) keep local context status but don't generate any code here
@@ -297,24 +329,35 @@ const FacultyDashboard = () => {
         description: `${classItem.class_name} session is active.`,
       });
     } catch (error) {
+      console.error("[FacultyDashboard] Error starting session:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to start session",
         variant: "destructive",
       });
+    } finally {
+      setStartingSession(false);
     }
   };
 
   const handleEndSession = async (classItem) => {
+    // Open confirmation dialog
+    setClassToEnd(classItem);
+    setEndSessionDialogOpen(true);
+  };
+
+  const confirmEndSession = async () => {
+    if (!classToEnd) return;
+
     try {
-      const activeSession = sessions[classItem.class_id];
+      const activeSession = sessions[classToEnd.class_id];
       if (!activeSession?.sessionId) throw new Error("No active session found");
-      await facultyAPI.endSession(classItem.class_id, activeSession.sessionId);
-      endSession(classItem.class_id);
-      setEndedClassIds((prev) => [...prev, classItem.class_id]);
+      await facultyAPI.endSession(classToEnd.class_id, activeSession.sessionId);
+      endSession(classToEnd.class_id);
+      setEndedClassIds((prev) => [...prev, classToEnd.class_id]);
       toast({
         title: "Session Ended",
-        description: `${classItem.class_name} session has ended.`,
+        description: `${classToEnd.class_name} session has ended.`,
       });
     } catch (error) {
       toast({
@@ -322,6 +365,9 @@ const FacultyDashboard = () => {
         description: error.message || "Failed to end session",
         variant: "destructive",
       });
+    } finally {
+      setEndSessionDialogOpen(false);
+      setClassToEnd(null);
     }
   };
 
@@ -527,6 +573,7 @@ const FacultyDashboard = () => {
                   onEndSession={handleEndSession}
                   onStartSession={handleStartSession}
                   onGoToAttendance={handleGoToAttendance}
+                  startingSession={startingSession}
                 />
               ))}
             </div>
@@ -548,6 +595,7 @@ const FacultyDashboard = () => {
                   onEndSession={handleEndSession}
                   onStartSession={handleStartSession}
                   onGoToAttendance={handleGoToAttendance}
+                  startingSession={startingSession}
                 />
               ))}
             </div>
@@ -569,6 +617,7 @@ const FacultyDashboard = () => {
                   onEndSession={handleEndSession}
                   onStartSession={handleStartSession}
                   onGoToAttendance={handleGoToAttendance}
+                  startingSession={startingSession}
                 />
               ))}
             </div>
@@ -601,6 +650,38 @@ const FacultyDashboard = () => {
           {selectedClass && <ClassDetails classItem={selectedClass} />}
         </DialogContent>
       </Dialog>
+
+      {/* End Session Confirmation Dialog */}
+      <AlertDialog
+        open={endSessionDialogOpen}
+        onOpenChange={setEndSessionDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End Attendance Session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to end the attendance session for{" "}
+              <strong>{classToEnd?.class_name}</strong>? This action will:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Mark all unmarked students as absent</li>
+                <li>Close the session permanently</li>
+                <li>Send notifications to all students</li>
+              </ul>
+              You will still be able to view the attendance records, but no
+              further attendance can be marked.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmEndSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              End Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

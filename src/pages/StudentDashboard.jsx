@@ -25,12 +25,27 @@ import { attendanceApi } from "@/api/attendance";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const monthNames = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
-// ✅ Calendar Component (unchanged)
-const AttendanceCalendar = ({ records, initialYear = 2025, initialMonth = 9 }) => {
+// ✅ Calendar Component with stats and session counts
+const AttendanceCalendar = ({
+  records,
+  sessionCounts = {},
+  initialYear = 2025,
+  initialMonth = 9,
+}) => {
   const [year, setYear] = React.useState(initialYear);
   const [month, setMonth] = React.useState(initialMonth);
 
@@ -46,17 +61,26 @@ const AttendanceCalendar = ({ records, initialYear = 2025, initialMonth = 9 }) =
 
   for (let day = 1; day <= daysInMonth; day++) {
     const status = records[day];
+    const counts = sessionCounts[day];
+
     week.push(
       <div
         key={day}
-        className={`h-12 flex items-center justify-center rounded-lg text-sm font-medium
-        ${status === "present"
-          ? "bg-green-500 text-white"
-          : status === "absent"
-          ? "bg-red-500 text-white"
-          : "bg-muted text-muted-foreground"}`}
+        className={`h-12 flex flex-col items-center justify-center rounded-lg text-sm font-medium
+        ${
+          status === "present"
+            ? "bg-green-500 text-white"
+            : status === "absent"
+            ? "bg-red-500 text-white"
+            : "bg-muted text-muted-foreground"
+        }`}
       >
-        {day}
+        <span className={counts ? "text-xs" : ""}>{day}</span>
+        {counts && (
+          <span className="text-[10px] opacity-90 font-normal">
+            {counts.present}/{counts.total}
+          </span>
+        )}
       </div>
     );
 
@@ -65,7 +89,11 @@ const AttendanceCalendar = ({ records, initialYear = 2025, initialMonth = 9 }) =
         for (let j = week.length; j < 7; j++)
           week.push(<div key={`empty-end-${j}`} className="h-12" />);
       }
-      weeks.push(<div key={`week-${day}`} className="grid grid-cols-7 gap-2">{week}</div>);
+      weeks.push(
+        <div key={`week-${day}`} className="grid grid-cols-7 gap-2">
+          {week}
+        </div>
+      );
       week = [];
     }
   }
@@ -73,22 +101,50 @@ const AttendanceCalendar = ({ records, initialYear = 2025, initialMonth = 9 }) =
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-2">
-        <button onClick={() => setMonth(month === 1 ? 12 : month - 1)} className="p-1 rounded hover:bg-muted">
+        <button
+          onClick={() => setMonth(month === 1 ? 12 : month - 1)}
+          className="p-1 rounded hover:bg-muted"
+        >
           <ChevronLeft className="h-5 w-5" />
         </button>
         <span className="font-semibold text-lg">
           {monthNames[month - 1]} {year}
         </span>
-        <button onClick={() => setMonth(month === 12 ? 1 : month + 1)} className="p-1 rounded hover:bg-muted">
+        <button
+          onClick={() => setMonth(month === 12 ? 1 : month + 1)}
+          className="p-1 rounded hover:bg-muted"
+        >
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
       <div className="grid grid-cols-7 text-center font-semibold text-muted-foreground">
-        <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+        <div>Mon</div>
+        <div>Tue</div>
+        <div>Wed</div>
+        <div>Thu</div>
+        <div>Fri</div>
+        <div>Sat</div>
+        <div>Sun</div>
       </div>
 
       {weeks}
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-green-500"></div>
+          <span className="text-sm">Present</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-red-500"></div>
+          <span className="text-sm">Absent</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-muted"></div>
+          <span className="text-sm">No Class</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -101,7 +157,7 @@ const StudentDashboard = () => {
   const [joinCode, setJoinCode] = useState("");
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
 
-  const [selectedClass, setSelectedClass] = useState(null);  // ✅ stores the class for which student enters code
+  const [selectedClass, setSelectedClass] = useState(null); // ✅ stores the class for which student enters code
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const [codeDialogOpen, setCodeDialogOpen] = useState(false);
@@ -168,7 +224,10 @@ const StudentDashboard = () => {
 
     try {
       await studentAPI.joinClass(joinCode);
-      toast({ title: "Successfully Joined", description: "You are now enrolled." });
+      toast({
+        title: "Successfully Joined",
+        description: "You are now enrolled.",
+      });
       setJoinCode("");
       setIsJoinDialogOpen(false);
       fetchEnrolledClasses();
@@ -187,17 +246,40 @@ const StudentDashboard = () => {
 
     try {
       const records = await studentAPI.getAttendanceRecords(classItem.id);
+
       const calendar = {};
+      const sessionCounts = {}; // Track sessions per day
 
       records.forEach((record) => {
         const date = new Date(record.recorded_at);
-        calendar[date.getDate()] =
-          record.status === "PRESENT" ? "present" : "absent";
+        const day = date.getDate();
+
+        // Initialize day data if not exists
+        if (!sessionCounts[day]) {
+          sessionCounts[day] = { total: 0, present: 0 };
+        }
+
+        sessionCounts[day].total++;
+        if (record.status === "PRESENT" || record.status === "LATE") {
+          sessionCounts[day].present++;
+        }
+
+        // Mark calendar day status based on majority
+        // If at least one present, show green; if all absent, show red
+        if (sessionCounts[day].present > 0) {
+          calendar[day] = "present";
+        } else {
+          calendar[day] = "absent";
+        }
       });
 
-      setAttendanceRecords(calendar);
-    } catch {
-      setAttendanceRecords({});
+      console.log("[StudentDashboard] Final calendar:", calendar);
+      console.log("[StudentDashboard] Final sessionCounts:", sessionCounts);
+
+      setAttendanceRecords({ calendar, records, sessionCounts });
+    } catch (error) {
+      console.error("[StudentDashboard] Error fetching attendance:", error);
+      setAttendanceRecords({ calendar: {}, records: [], sessionCounts: {} });
     } finally {
       setRecordsLoading(false);
     }
@@ -252,7 +334,6 @@ const StudentDashboard = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8">
-
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
@@ -284,7 +365,10 @@ const StudentDashboard = () => {
               </div>
 
               <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsJoinDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsJoinDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button onClick={handleJoinClass}>Join</Button>
@@ -306,12 +390,11 @@ const StudentDashboard = () => {
               </CardHeader>
 
               <CardContent className="space-y-4">
-
                 {/* ✅ ALWAYS SHOW CODE BUTTON */}
                 <Button
                   className="w-full"
                   onClick={() => {
-                    setSelectedClass(c);   // ✅ STORE SELECTED CLASS
+                    setSelectedClass(c); // ✅ STORE SELECTED CLASS
                     setCodeDialogOpen(true);
                   }}
                 >
@@ -328,17 +411,145 @@ const StudentDashboard = () => {
 
         {/* Attendance Details */}
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             {selectedClass && (
               <>
                 <DialogHeader>
-                  <DialogTitle>{selectedClass.name} - Attendance</DialogTitle>
+                  <DialogTitle>
+                    {selectedClass.name} - Attendance Details
+                  </DialogTitle>
                 </DialogHeader>
 
                 {recordsLoading ? (
                   <Loader className="h-6 w-6 animate-spin mx-auto" />
                 ) : (
-                  <AttendanceCalendar records={attendanceRecords} />
+                  <div className="space-y-6">
+                    {/* Statistics Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardDescription>Total Sessions</CardDescription>
+                          <CardTitle className="text-2xl">
+                            {attendanceRecords.records?.length || 0}
+                          </CardTitle>
+                        </CardHeader>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardDescription>Present</CardDescription>
+                          <CardTitle className="text-2xl text-green-600">
+                            {attendanceRecords.records?.filter(
+                              (r) =>
+                                r.status === "PRESENT" || r.status === "LATE"
+                            ).length || 0}
+                          </CardTitle>
+                        </CardHeader>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardDescription>Absent</CardDescription>
+                          <CardTitle className="text-2xl text-red-600">
+                            {attendanceRecords.records?.filter(
+                              (r) => r.status === "ABSENT"
+                            ).length || 0}
+                          </CardTitle>
+                        </CardHeader>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardDescription>Attendance Rate</CardDescription>
+                          <CardTitle className="text-2xl">
+                            {attendanceRecords.records?.length > 0
+                              ? Math.round(
+                                  (attendanceRecords.records.filter(
+                                    (r) =>
+                                      r.status === "PRESENT" ||
+                                      r.status === "LATE"
+                                  ).length /
+                                    attendanceRecords.records.length) *
+                                    100
+                                )
+                              : 0}
+                            %
+                          </CardTitle>
+                        </CardHeader>
+                      </Card>
+                    </div>
+
+                    {/* Calendar View */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">
+                        Calendar View
+                      </h3>
+                      <AttendanceCalendar
+                        records={attendanceRecords.calendar || {}}
+                        sessionCounts={attendanceRecords.sessionCounts || {}}
+                      />
+                    </div>
+
+                    {/* Session List */}
+                    {attendanceRecords.records &&
+                      attendanceRecords.records.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-4">
+                            Session History
+                          </h3>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {attendanceRecords.records.map((record, idx) => (
+                              <div
+                                key={record.record_id || idx}
+                                className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${
+                                      record.status === "PRESENT" ||
+                                      record.status === "LATE"
+                                        ? "bg-green-500"
+                                        : "bg-red-500"
+                                    }`}
+                                  />
+                                  <div>
+                                    <p className="font-medium">
+                                      {new Date(
+                                        record.recorded_at
+                                      ).toLocaleDateString("en-US", {
+                                        weekday: "long",
+                                        year: "numeric",
+                                        month: "long",
+                                        day: "numeric",
+                                      })}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {new Date(
+                                        record.recorded_at
+                                      ).toLocaleTimeString("en-US", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge
+                                  variant={
+                                    record.status === "PRESENT"
+                                      ? "default"
+                                      : record.status === "LATE"
+                                      ? "secondary"
+                                      : "destructive"
+                                  }
+                                >
+                                  {record.status}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                  </div>
                 )}
               </>
             )}
@@ -362,14 +573,16 @@ const StudentDashboard = () => {
             </div>
 
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setCodeDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setCodeDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button onClick={handleCodeSubmit}>Submit</Button>
             </div>
           </DialogContent>
         </Dialog>
-
       </div>
     </div>
   );

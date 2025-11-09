@@ -65,24 +65,134 @@ def absent_students(class_id: int, date: str):
     return queries.get_absent_students_in_class_on_date(class_id, date)
 
 
-@app.get("/user/{user_id}/notifications/unread")
-def unread_notifications(user_id: int, date: Optional[str] = None):
-    if date:
-        return queries.get_unread_notifications_for_user_on_date(user_id, date)
-    else:
-        return queries.get_unread_notifications_for_user_on_date(
-            user_id, date=str(date) if date else "1970-01-01"
-        )
+# -------------------- NOTIFICATIONS --------------------
+@app.get("/api/notifications/{user_id}")
+def get_notifications(user_id: int, unread_only: bool = False):
+    """Get all notifications for a user, optionally filtered to unread only"""
+    try:
+        with engine.connect() as conn:
+            if unread_only:
+                sql = text(
+                    """
+                    SELECT *
+                    FROM notifications
+                    WHERE user_id = :uid AND is_read = FALSE
+                    ORDER BY created_at DESC
+                    """
+                )
+            else:
+                sql = text(
+                    """
+                    SELECT *
+                    FROM notifications
+                    WHERE user_id = :uid
+                    ORDER BY created_at DESC
+                    LIMIT 50
+                    """
+                )
+            
+            rows = conn.execute(sql, {"uid": user_id}).fetchall()
+            result = []
+            for row in rows:
+                notification = dict(row._mapping)
+                # Ensure backward compatibility - add missing fields if they don't exist
+                if 'notification_id' not in notification:
+                    notification['notification_id'] = notification.get('id')
+                if 'title' not in notification:
+                    notification['title'] = notification.get('type', '').replace('_', ' ').title()
+                if 'message' not in notification:
+                    notification['message'] = notification.get('content', '')
+                if 'priority' not in notification:
+                    notification['priority'] = 'medium'
+                if 'related_class_id' not in notification:
+                    notification['related_class_id'] = None
+                if 'related_session_id' not in notification:
+                    notification['related_session_id'] = None
+                if 'class_name' not in notification:
+                    notification['class_name'] = None
+                if 'section' not in notification:
+                    notification['section'] = None
+                result.append(notification)
+            return result
+    except Exception as e:
+        print(f"[NOTIFICATIONS] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/user/{user_id}/notifications/attendance")
-def attendance_notifications(user_id: int):
-    return queries.get_attendance_notifications_for_user(user_id)
+@app.get("/api/notifications/{user_id}/unread-count")
+def get_unread_count(user_id: int):
+    """Get count of unread notifications"""
+    try:
+        with engine.connect() as conn:
+            sql = text(
+                """
+                SELECT COUNT(*) as count
+                FROM notifications
+                WHERE user_id = :uid AND is_read = FALSE
+                """
+            )
+            row = conn.execute(sql, {"uid": user_id}).fetchone()
+            return {"count": row.count if row else 0}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/user/{user_id}/notifications/sessions")
-def session_notifications(user_id: int):
-    return queries.get_session_notifications_for_user(user_id)
+@app.put("/api/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int):
+    """Mark a notification as read"""
+    try:
+        with engine.connect() as conn:
+            sql = text(
+                """
+                UPDATE notifications
+                SET is_read = TRUE
+                WHERE notification_id = :nid
+                """
+            )
+            conn.execute(sql, {"nid": notification_id})
+            conn.commit()
+            return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/notifications/{user_id}/mark-all-read")
+def mark_all_read(user_id: int):
+    """Mark all notifications as read for a user"""
+    try:
+        with engine.connect() as conn:
+            sql = text(
+                """
+                UPDATE notifications
+                SET is_read = TRUE
+                WHERE user_id = :uid AND is_read = FALSE
+                """
+            )
+            conn.execute(sql, {"uid": user_id})
+            conn.commit()
+            return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/notifications/{notification_id}")
+def delete_notification(notification_id: int):
+    """Delete a notification"""
+    try:
+        with engine.connect() as conn:
+            sql = text(
+                """
+                DELETE FROM notifications
+                WHERE notification_id = :nid
+                """
+            )
+            conn.execute(sql, {"nid": notification_id})
+            conn.commit()
+            return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/class/{class_id}/students/below_percentage")
@@ -235,42 +345,186 @@ def delete_faculty_class(class_id: int):
 def start_session(class_id: int):
     """Start a new attendance session with generated code"""
     try:
-        code = generate_code()
-        sql = text(
-            """
-            INSERT INTO attendance_sessions (class_id, start_time, status, generated_code)
-            VALUES (:class_id, NOW(), 'ACTIVE', :code)
-            RETURNING session_id, class_id, start_time, status, generated_code
-            """
-        )
+        print(f"[START_SESSION] Request to start session for class_id={class_id}")
+        
         with engine.connect() as conn:
+            # Check if there's already an active session for this class
+            check_sql = text(
+                """
+                SELECT session_id, generated_code 
+                FROM attendance_sessions 
+                WHERE class_id = :class_id AND status = 'ACTIVE'
+                LIMIT 1
+                """
+            )
+            existing = conn.execute(check_sql, {"class_id": class_id}).fetchone()
+            
+            if existing:
+                print(f"[START_SESSION] Active session already exists: session_id={existing.session_id}")
+                return dict(existing._mapping)
+            
+            # Create new session
+            code = generate_code()
+            print(f"[START_SESSION] Creating new session with code={code}")
+            
+            sql = text(
+                """
+                INSERT INTO attendance_sessions (class_id, start_time, status, generated_code)
+                VALUES (:class_id, NOW(), 'ACTIVE', :code)
+                RETURNING session_id, class_id, start_time, status, generated_code
+                """
+            )
             res = conn.execute(sql, {"class_id": class_id, "code": code})
             conn.commit()
-            return dict(res.fetchone()._mapping)
+            
+            result = dict(res.fetchone()._mapping)
+            print(f"[START_SESSION] Created session_id={result['session_id']}")
+            
+            # Get class name and enrolled students
+            class_sql = text("SELECT class_name FROM classes WHERE class_id = :cid")
+            class_row = conn.execute(class_sql, {"cid": class_id}).fetchone()
+            class_name = class_row[0] if class_row else "Unknown Class"
+            
+            students_sql = text(
+                """
+                SELECT student_id FROM class_enrollments WHERE class_id = :cid
+                """
+            )
+            students = conn.execute(students_sql, {"cid": class_id}).fetchall()
+            
+            # Create notifications for all enrolled students
+            for student in students:
+                create_notification(
+                    user_id=student[0],
+                    type="session_start",
+                    title="New Attendance Session",
+                    message=f"{class_name} attendance session is now active. Code: {code}",
+                    priority="high",
+                    related_class_id=class_id,
+                    related_session_id=result['session_id']
+                )
+            
+            print(f"[START_SESSION] Created {len(students)} notifications")
+            
+            return result
     except Exception as e:
+        print(f"[START_SESSION] ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.put("/api/faculty/classes/{class_id}/sessions/{session_id}/end")
 def end_session(class_id: int, session_id: int):
     try:
-        sql = text(
-            """
-            UPDATE attendance_sessions
-            SET end_time = NOW(), status = 'CLOSED'
-            WHERE session_id = :session_id AND class_id = :class_id
-            RETURNING *
-            """
-        )
+        print(f"[END_SESSION] Ending session_id={session_id}, class_id={class_id}")
+        
         with engine.connect() as conn:
+            # First, mark all enrolled students who don't have a record as ABSENT
+            mark_absent_sql = text(
+                """
+                INSERT INTO attendance_records (session_id, student_id, status, marked_at)
+                SELECT :session_id, ce.student_id, 'ABSENT', NOW()
+                FROM class_enrollments ce
+                WHERE ce.class_id = :class_id
+                AND NOT EXISTS (
+                    SELECT 1 FROM attendance_records ar
+                    WHERE ar.session_id = :session_id
+                    AND ar.student_id = ce.student_id
+                )
+                """
+            )
+            result = conn.execute(
+                mark_absent_sql, 
+                {"session_id": session_id, "class_id": class_id}
+            )
+            absent_count = result.rowcount
+            print(f"[END_SESSION] Marked {absent_count} students as ABSENT")
+            
+            # Then update the session status
+            sql = text(
+                """
+                UPDATE attendance_sessions
+                SET end_time = NOW(), status = 'CLOSED'
+                WHERE session_id = :session_id AND class_id = :class_id
+                RETURNING *
+                """
+            )
             row = conn.execute(
                 sql, {"session_id": session_id, "class_id": class_id}
             ).fetchone()
             conn.commit()
+            
             if not row:
                 raise HTTPException(status_code=404, detail="Session not found")
+            
+            # Get attendance statistics and class name
+            stats_sql = text(
+                """
+                SELECT 
+                    COUNT(CASE WHEN status = 'PRESENT' THEN 1 END) as present_count,
+                    COUNT(CASE WHEN status = 'LATE' THEN 1 END) as late_count,
+                    COUNT(CASE WHEN status = 'ABSENT' THEN 1 END) as absent_count,
+                    COUNT(*) as total_count
+                FROM attendance_records
+                WHERE session_id = :sid
+                """
+            )
+            stats = conn.execute(stats_sql, {"sid": session_id}).fetchone()
+            
+            class_sql = text("SELECT class_name FROM classes WHERE class_id = :cid")
+            class_row = conn.execute(class_sql, {"cid": class_id}).fetchone()
+            class_name = class_row[0] if class_row else "Unknown Class"
+            
+            # Get all students and send notifications
+            students_sql = text(
+                """
+                SELECT ar.student_id, ar.status
+                FROM attendance_records ar
+                WHERE ar.session_id = :sid
+                """
+            )
+            students = conn.execute(students_sql, {"sid": session_id}).fetchall()
+            
+            for student in students:
+                student_id, status = student[0], student[1]
+                if status == 'PRESENT' or status == 'LATE':
+                    create_notification(
+                        user_id=student_id,
+                        type="attendance_marked",
+                        title="Attendance Recorded",
+                        message=f"Your attendance has been marked as {status} for {class_name}",
+                        priority="low",
+                        related_class_id=class_id,
+                        related_session_id=session_id
+                    )
+                else:  # ABSENT
+                    create_notification(
+                        user_id=student_id,
+                        type="attendance_absent",
+                        title="Marked Absent",
+                        message=f"You were marked absent for {class_name}",
+                        priority="medium",
+                        related_class_id=class_id,
+                        related_session_id=session_id
+                    )
+            
+            # Send summary notification to faculty (get faculty_id from class)
+            faculty_sql = text("SELECT faculty_id FROM classes WHERE class_id = :cid")
+            faculty_row = conn.execute(faculty_sql, {"cid": class_id}).fetchone()
+            if faculty_row:
+                create_notification(
+                    user_id=faculty_row[0],
+                    type="session_ended",
+                    title="Session Ended",
+                    message=f"{class_name} attendance session ended. {stats[0]}/{stats[3]} students present.",
+                    priority="medium",
+                    related_class_id=class_id,
+                    related_session_id=session_id
+                )
+            
+            print(f"[END_SESSION] Session closed successfully, notifications sent")
             return dict(row._mapping)
     except Exception as e:
+        print(f"[END_SESSION] ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -554,6 +808,38 @@ def join_class(join_data: JoinClassRequest):
                 {"student_id": join_data.student_id, "class_id": class_id},
             )
             conn.commit()
+            
+            # Get student and class details for notification
+            student_sql = text("SELECT name FROM users WHERE user_id = :uid")
+            student_row = conn.execute(student_sql, {"uid": join_data.student_id}).fetchone()
+            student_name = student_row[0] if student_row else "Unknown Student"
+            
+            class_detail_sql = text("SELECT class_name, faculty_id FROM classes WHERE class_id = :cid")
+            class_detail = conn.execute(class_detail_sql, {"cid": class_id}).fetchone()
+            class_name = class_detail[0] if class_detail else "Unknown Class"
+            faculty_id = class_detail[1] if class_detail else None
+            
+            # Notify the student
+            create_notification(
+                user_id=join_data.student_id,
+                type="class_joined",
+                title="Joined Class",
+                message=f"You have successfully joined {class_name}",
+                priority="low",
+                related_class_id=class_id
+            )
+            
+            # Notify the faculty
+            if faculty_id:
+                create_notification(
+                    user_id=faculty_id,
+                    type="student_joined",
+                    title="New Student",
+                    message=f"{student_name} has joined your {class_name} class",
+                    priority="low",
+                    related_class_id=class_id
+                )
+            
             print(f"[JOIN] Successfully enrolled!")
             return {"message": "Successfully joined class", "class_id": class_id}
     except HTTPException:
@@ -613,6 +899,20 @@ def submit_code(payload: SubmitAttendanceCode):
                 conn.execute(insert_sql, {"ses": session_id, "sid": payload.student_id})
 
             conn.commit()
+            
+            # Get class name and create notification
+            class_sql = text("SELECT class_name FROM classes WHERE class_id = :cid")
+            class_info = conn.execute(class_sql, {"cid": class_id}).fetchone()
+            if class_info:
+                class_name = class_info[0]
+                create_notification(
+                    user_id=payload.student_id,
+                    type="attendance_marked",
+                    title="Attendance Confirmed",
+                    message=f"Your attendance has been recorded as PRESENT for {class_name}",
+                    priority="low"
+                )
+            
             return {
                 "message": "Attendance marked successfully",
                 "session_id": session_id,
@@ -626,6 +926,8 @@ def submit_code(payload: SubmitAttendanceCode):
 def mark_attendance_manual(session_id: int, payload: MarkAttendanceRequest):
     try:
         status = (payload.status or "PRESENT").upper()
+        print(f"[MANUAL_ATTENDANCE] session_id={session_id}, student_id={payload.student_id}, status={status}")
+        
         if status not in ("PRESENT", "LATE", "ABSENT"):
             raise HTTPException(status_code=400, detail="Invalid status")
 
@@ -648,6 +950,7 @@ def mark_attendance_manual(session_id: int, payload: MarkAttendanceRequest):
                 {"st": status, "sid": session_id, "uid": payload.student_id},
             )
             if upd.rowcount == 0:
+                print(f"[MANUAL_ATTENDANCE] No existing record, inserting new one")
                 conn.execute(
                     text(
                         """
@@ -657,7 +960,33 @@ def mark_attendance_manual(session_id: int, payload: MarkAttendanceRequest):
                     ),
                     {"sid": session_id, "uid": payload.student_id, "st": status},
                 )
+            else:
+                print(f"[MANUAL_ATTENDANCE] Updated existing record")
             conn.commit()
+            
+            # Get class info for notification
+            class_sql = text(
+                """
+                SELECT c.class_name, c.class_id
+                FROM classes c
+                JOIN attendance_sessions s ON c.class_id = s.class_id
+                WHERE s.session_id = :sid
+                """
+            )
+            class_info = conn.execute(class_sql, {"sid": session_id}).fetchone()
+            
+            if class_info:
+                class_name = class_info[0]
+                # Send notification to student
+                create_notification(
+                    user_id=payload.student_id,
+                    type="attendance_marked",
+                    title="Attendance Updated",
+                    message=f"Your attendance has been manually marked as {status} for {class_name}",
+                    priority="medium"
+                )
+            
+            print(f"[MANUAL_ATTENDANCE] Successfully saved status={status}")
             return {
                 "message": "Attendance updated",
                 "session_id": session_id,
@@ -665,6 +994,7 @@ def mark_attendance_manual(session_id: int, payload: MarkAttendanceRequest):
                 "status": status,
             }
     except Exception as e:
+        print(f"[MANUAL_ATTENDANCE] ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -702,6 +1032,7 @@ def get_student_class_details(class_id: int, student_id: int):
 @app.get("/api/student/classes/{class_id}/attendance")
 def get_student_attendance_records(class_id: int, student_id: int):
     try:
+        print(f"[STUDENT_ATTENDANCE] Fetching records for class_id={class_id}, student_id={student_id}")
         sql = text(
             """
             SELECT ar.record_id, ar.session_id, ar.student_id, ar.status, ar.marked_at as recorded_at, c.class_name
@@ -713,13 +1044,18 @@ def get_student_attendance_records(class_id: int, student_id: int):
             """
         )
         with engine.connect() as conn:
-            return [
+            results = [
                 dict(r._mapping)
                 for r in conn.execute(
                     sql, {"class_id": class_id, "student_id": student_id}
                 )
             ]
+            print(f"[STUDENT_ATTENDANCE] Found {len(results)} records")
+            for r in results:
+                print(f"  - record_id={r['record_id']}, status={r['status']}, date={r['recorded_at']}")
+            return results
     except Exception as e:
+        print(f"[STUDENT_ATTENDANCE] ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -729,18 +1065,22 @@ def list_sessions_by_date(
     class_id: int, date: str = Query(..., description="YYYY-MM-DD")
 ):
     try:
-        sql = text(
-            """
-            SELECT session_id, class_id, start_time, end_time, status
-            FROM attendance_sessions
-            WHERE class_id = :cid AND DATE(start_time) = CAST(:d AS DATE)
-            ORDER BY start_time ASC
-            """
-        )
         with engine.connect() as conn:
+            sql = text(
+                """
+                SELECT session_id, class_id, start_time, end_time, status
+                FROM attendance_sessions
+                WHERE class_id = :cid AND DATE(start_time) = CAST(:d AS DATE)
+                ORDER BY start_time ASC
+                """
+            )
             rows = conn.execute(sql, {"cid": class_id, "d": date}).fetchall()
-            return [dict(r._mapping) for r in rows]
+            result = [dict(r._mapping) for r in rows]
+            return result
     except Exception as e:
+        print(f"[SESSIONS_BY_DATE] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -845,3 +1185,39 @@ def get_class_sessions_stats(class_id: int):
             return {"sessions_count": sessions_count, "last_session": last_session}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# HELPER FUNCTION FOR NOTIFICATIONS
+# ============================================================================
+
+def create_notification(
+    user_id: int,
+    type: str,
+    title: str,
+    message: str,
+    priority: str = "medium",
+    related_class_id: Optional[int] = None,
+    related_session_id: Optional[int] = None
+):
+    """Helper function to create notifications - works with existing table schema"""
+    try:
+        with engine.connect() as conn:
+            # Use only columns that exist in the actual notifications table
+            sql = text(
+                """
+                INSERT INTO notifications 
+                (user_id, type, message, is_read, created_at)
+                VALUES (:uid, :type, :message, FALSE, CURRENT_TIMESTAMP)
+                """
+            )
+            conn.execute(sql, {
+                "uid": user_id,
+                "type": type,
+                "message": message  # Combine title and message for the message field
+            })
+            conn.commit()
+            print(f"[NOTIFICATION] Created notification for user_id={user_id}, type={type}")
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to create notification: {str(e)}")
+
