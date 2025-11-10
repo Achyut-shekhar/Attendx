@@ -19,9 +19,32 @@ async function login(email, password, role) {
       throw new Error(errorData.detail || "Invalid credentials");
     }
 
-    return response.json(); // Should contain access_token + user
+    return response.json(); // Should contain user data
   } catch (error) {
     console.error("Login API error:", error);
+    throw error;
+  }
+}
+
+// ✅ ✅ 🟢 REGISTER API (NEW)
+async function register(userData) {
+  try {
+    const response = await fetch(`${API_URL}/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(userData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Registration failed");
+    }
+
+    return response.json(); // success message
+  } catch (error) {
+    console.error("Register API error:", error);
     throw error;
   }
 }
@@ -48,5 +71,6 @@ async function getProfile() {
 // ✅ Export object for AuthContext
 export const authApi = {
   login,
+  register,   // ✅ added here
   getProfile,
 };

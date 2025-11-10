@@ -9,6 +9,8 @@ import os
 from dotenv import load_dotenv
 import random
 import string
+from sqlalchemy.orm import Session
+
 
 app = FastAPI(title="Attendance Management API")
 
@@ -1221,3 +1223,47 @@ def create_notification(
     except Exception as e:
         print(f"[NOTIFICATION] Failed to create notification: {str(e)}")
 
+#------------Registration Endpoint-----------------
+#------------Registration Endpoint-----------------
+
+class UserRegister(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str
+    roll_number: int | None = None
+
+
+@app.post("/register")
+def register_user(user: UserRegister):
+    try:
+        with engine.connect() as conn:
+            # Check if email exists
+            existing = conn.execute(
+                text("SELECT * FROM users WHERE email = :email"),
+                {"email": user.email}
+            ).fetchone()
+
+            if existing:
+                raise HTTPException(status_code=400, detail="Email already registered")
+
+            # Insert user (plain password as login expects)
+            conn.execute(
+                text("""
+                    INSERT INTO users (name, email, password_hash, role, roll_number)
+                    VALUES (:name, :email, :password, :role, :roll_number)
+                """),
+                {
+                    "name": user.name,
+                    "email": user.email,
+                    "password": user.password,
+                    "role": user.role,
+                    "roll_number": user.roll_number,
+                }
+            )
+
+            conn.commit()
+            return {"message": "User registered successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

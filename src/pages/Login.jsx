@@ -197,6 +197,18 @@ const Login = () => {
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
+
+              {/* ✅ Added Register Link */}
+              <div className="text-center text-sm mt-4">
+                Don't have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/register")}
+                  className="text-primary hover:underline"
+                >
+                  Register here
+                </button>
+              </div>
             </form>
           </CardContent>
         </Card>
