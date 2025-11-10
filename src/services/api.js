@@ -50,8 +50,20 @@ export const facultyAPI = {
   },
 
   /* ------------------ Sessions ------------------ */
-  async startSession(class_id) {
-    const { data } = await api.post(`/faculty/classes/${class_id}/sessions`);
+  async startSession(class_id, locationData = null) {
+    const payload = { class_id };
+
+    // Add location data if provided
+    if (locationData) {
+      payload.latitude = locationData.latitude;
+      payload.longitude = locationData.longitude;
+      payload.radius_meters = locationData.radius_meters || 50;
+    }
+
+    const { data } = await api.post(
+      `/faculty/classes/${class_id}/sessions`,
+      payload
+    );
     return data;
   },
 

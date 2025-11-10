@@ -75,11 +75,13 @@ const ClassDetails = ({ classItem }) => {
 
       const recs = Array.isArray(data?.records) ? data.records : [];
 
-      const present = recs.filter((x) => x.status === "PRESENT").length;
-      const late = recs.filter((x) => x.status === "LATE").length;
+      // Count LATE as PRESENT
+      const present = recs.filter(
+        (x) => x.status === "PRESENT" || x.status === "LATE"
+      ).length;
       const absent = recs.filter((x) => x.status === "ABSENT").length;
 
-      setTotals({ present, late, absent });
+      setTotals({ present, late: 0, absent });
       setRows(
         recs.sort((a, b) => a.student_name.localeCompare(b.student_name))
       );
@@ -178,18 +180,11 @@ const ClassDetails = ({ classItem }) => {
               )}
 
               {/* Totals */}
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="p-4 bg-green-50 rounded-lg">
                   <p className="text-sm text-green-600">Present</p>
                   <p className="text-3xl font-bold text-green-700">
                     {totals.present}
-                  </p>
-                </div>
-
-                <div className="p-4 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-yellow-700">Late</p>
-                  <p className="text-3xl font-bold text-yellow-800">
-                    {totals.late}
                   </p>
                 </div>
 
@@ -219,14 +214,12 @@ const ClassDetails = ({ classItem }) => {
                       <TableCell>
                         <Badge
                           variant={
-                            r.status === "PRESENT"
+                            r.status === "PRESENT" || r.status === "LATE"
                               ? "default"
-                              : r.status === "LATE"
-                              ? "secondary"
                               : "destructive"
                           }
                         >
-                          {r.status}
+                          {r.status === "LATE" ? "PRESENT" : r.status}
                         </Badge>
                       </TableCell>
 

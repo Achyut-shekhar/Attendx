@@ -44,6 +44,7 @@ import { useNavigate } from "react-router-dom";
 import { useAttendance } from "@/contexts/AttendanceContext";
 import { Badge } from "@/components/ui/badge";
 import ClassDetails from "@/components/ClassDetails";
+import LocationCapture from "@/components/attendance/LocationCapture";
 
 const ClassCard = ({
   classItem,
@@ -192,6 +193,12 @@ const FacultyDashboard = () => {
   const [endSessionDialogOpen, setEndSessionDialogOpen] = useState(false);
   const [classToEnd, setClassToEnd] = useState(null);
 
+  // Location-based attendance states
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const [classToStart, setClassToStart] = useState(null);
+  const [sessionLocation, setSessionLocation] = useState(null);
+  const [radiusMeters, setRadiusMeters] = useState(50);
+
   // Helper: enrich a class with dynamic stats (students count, sessions count, last session time)
   const enrichClassWithStats = async (cls) => {
     try {
@@ -296,20 +303,48 @@ const FacultyDashboard = () => {
     }
   };
 
-  // IMPORTANT: Option A flow — no popup here; just navigate with sessionId
+  // Handler for location capture
+  const handleLocationCaptured = (locationData) => {
+    setSessionLocation(locationData);
+  };
+
+  // Start session with optional location
   const handleStartSession = async (classItem) => {
     if (startingSession) {
       console.log("[FacultyDashboard] Ignoring duplicate start session click");
       return;
     }
 
+    // Open location dialog to let faculty choose
+    setClassToStart(classItem);
+    setSessionLocation(null);
+    setLocationDialogOpen(true);
+  };
+
+  // Proceed with session start (with or without location)
+  const proceedWithSessionStart = async (useLocation) => {
+    if (!classToStart) return;
+
     try {
       setStartingSession(true);
       console.log(
-        `[FacultyDashboard] Starting session for class_id=${classItem.class_id}`
+        `[FacultyDashboard] Starting session for class_id=${classToStart.class_id}`
       );
 
-      const session = await facultyAPI.startSession(classItem.class_id);
+      let locationData = null;
+      if (useLocation && sessionLocation) {
+        locationData = {
+          latitude: sessionLocation.latitude,
+          longitude: sessionLocation.longitude,
+          radius_meters: radiusMeters,
+        };
+        console.log("[FacultyDashboard] Using location:", locationData);
+      }
+
+      const session = await facultyAPI.startSession(
+        classToStart.class_id,
+        locationData
+      );
       const sessionId = session.session_id;
 
       console.log(
@@ -318,15 +353,22 @@ const FacultyDashboard = () => {
 
       if (!sessionId) throw new Error("Invalid session response");
 
-      // (Optional) keep local context status but don't generate any code here
-      startSession(classItem.class_id);
+      // Update context
+      startSession(classToStart.class_id);
 
-      // Navigate to attendance page with the sessionId — popup will be on the Code tab
-      navigate(`/attendance/${classItem.class_id}?sessionId=${sessionId}`);
+      // Close location dialog
+      setLocationDialogOpen(false);
+      setClassToStart(null);
+      setSessionLocation(null);
+
+      // Navigate to attendance page
+      navigate(`/attendance/${classToStart.class_id}?sessionId=${sessionId}`);
 
       toast({
         title: "Session Started",
-        description: `${classItem.class_name} session is active.`,
+        description: useLocation
+          ? `${classToStart.class_name} session started with location-based attendance (${radiusMeters}m radius).`
+          : `${classToStart.class_name} session is active.`,
       });
     } catch (error) {
       console.error("[FacultyDashboard] Error starting session:", error);
@@ -682,6 +724,68 @@ const FacultyDashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Location Capture Dialog */}
+      <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Start Attendance Session</DialogTitle>
+            <DialogDescription>
+              Choose how to track attendance for{" "}
+              <strong>{classToStart?.class_name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <h3 className="font-medium">Location-Based Attendance</h3>
+              <p className="text-sm text-muted-foreground">
+                Enable location verification to ensure students are physically
+                present in the classroom.
+              </p>
+
+              <LocationCapture onLocationCaptured={handleLocationCaptured} />
+
+              {sessionLocation && (
+                <div className="space-y-2">
+                  <Label htmlFor="radius">Allowed Radius (meters)</Label>
+                  <Input
+                    id="radius"
+                    type="number"
+                    min="10"
+                    max="500"
+                    value={radiusMeters}
+                    onChange={(e) =>
+                      setRadiusMeters(parseInt(e.target.value) || 50)
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Students must be within {radiusMeters}m of your location to
+                    mark attendance.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => proceedWithSessionStart(false)}
+              disabled={startingSession}
+            >
+              Start Without Location
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => proceedWithSessionStart(true)}
+              disabled={!sessionLocation || startingSession}
+            >
+              {startingSession ? "Starting..." : "Start with Location"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

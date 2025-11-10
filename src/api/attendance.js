@@ -4,11 +4,19 @@ const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export const attendanceApi = {
   // STUDENT: Submit attendance using generated code
-  async submitAttendanceCode(studentId, code) {
+  async submitAttendanceCode(studentId, code, location = null) {
+    const payload = { student_id: studentId, code };
+
+    // Add location if provided
+    if (location) {
+      payload.latitude = location.latitude;
+      payload.longitude = location.longitude;
+    }
+
     const res = await fetch(`${API_URL}/attendance/submit-code`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ student_id: studentId, code }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Failed to submit attendance");

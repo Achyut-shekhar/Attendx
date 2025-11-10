@@ -116,7 +116,7 @@ const Attendance = () => {
         <TabsList>
           <TabsTrigger value="manual">Manual Attendance</TabsTrigger>
           <TabsTrigger value="code">Code Generation</TabsTrigger>
-          <TabsTrigger value="location">Location Check</TabsTrigger>
+         
         </TabsList>
 
         {/* ✅ Manual Attendance */}
@@ -140,10 +140,10 @@ const Attendance = () => {
           />
         </TabsContent>
 
-        {/* ✅ Location Based Attendance */}
+        {/* ✅ Location Based Attendance
         <TabsContent value="location">
           <LocationCheck classId={classId} sessionId={sessionId} />
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </div>
   );

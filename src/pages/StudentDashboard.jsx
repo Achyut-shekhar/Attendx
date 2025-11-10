@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { studentAPI } from "@/services/api";
 import { attendanceApi } from "@/api/attendance";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import LocationCapture from "@/components/attendance/LocationCapture";
 
 const monthNames = [
   "January",
@@ -163,6 +164,9 @@ const StudentDashboard = () => {
   const [codeDialogOpen, setCodeDialogOpen] = useState(false);
   const [enteredCode, setEnteredCode] = useState("");
 
+  // Location state for attendance
+  const [studentLocation, setStudentLocation] = useState(null);
+
   const [attendanceRecords, setAttendanceRecords] = useState({});
   const [recordsLoading, setRecordsLoading] = useState(false);
 
@@ -287,6 +291,11 @@ const StudentDashboard = () => {
     setDetailsOpen(true);
   };
 
+  // Handler for location capture
+  const handleLocationCaptured = (locationData) => {
+    setStudentLocation(locationData);
+  };
+
   // ✅✅ ENTER CODE FIXED — RECORD CLASS + UPPERCASE CODE
   const handleCodeSubmit = async () => {
     if (!enteredCode.trim()) {
@@ -302,14 +311,40 @@ const StudentDashboard = () => {
       const user = JSON.parse(localStorage.getItem("user"));
       const finalCode = enteredCode.toUpperCase();
 
-      await attendanceApi.submitAttendanceCode(user.user_id, finalCode);
+      // Submit with location if captured
+      const response = await attendanceApi.submitAttendanceCode(
+        user.user_id,
+        finalCode,
+        studentLocation
+      );
+
+      // Show detailed success message
+      let description = "Your attendance is recorded.";
+      if (response.distance !== null && response.distance !== undefined) {
+        if (response.within_radius) {
+          description = `✓ You are within the classroom radius (${Math.round(
+            response.distance
+          )}m away). Attendance marked as PRESENT.`;
+        } else {
+          description = `✗ You are outside the classroom radius (${Math.round(
+            response.distance
+          )}m away). Marked as ABSENT.`;
+        }
+      } else if (studentLocation) {
+        description = "Your attendance is recorded with location verification.";
+      }
 
       toast({
-        title: "Attendance Marked ✅",
-        description: "Your attendance is recorded.",
+        title:
+          response.within_radius === false
+            ? "Outside Classroom Radius ⚠️"
+            : "Attendance Marked ✅",
+        description: description,
+        variant: response.within_radius === false ? "destructive" : "default",
       });
 
       setEnteredCode("");
+      setStudentLocation(null);
       setCodeDialogOpen(false);
       fetchEnrolledClasses();
     } catch (error) {
@@ -558,28 +593,75 @@ const StudentDashboard = () => {
 
         {/* ✅ Enter Attendance Code Dialog */}
         <Dialog open={codeDialogOpen} onOpenChange={setCodeDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Enter Attendance Code</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-2 py-4">
-              <Label>Attendance Code</Label>
-              <Input
-                placeholder="e.g., XH9ZQA"
-                value={enteredCode}
-                onChange={(e) => setEnteredCode(e.target.value.toUpperCase())}
-              />
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Attendance Code</Label>
+                <Input
+                  placeholder="e.g., XH9ZQA"
+                  value={enteredCode}
+                  onChange={(e) => setEnteredCode(e.target.value.toUpperCase())}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Location Verification</Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Some sessions may require location verification. Capture your
+                  location to ensure attendance is recorded correctly.
+                </p>
+                <LocationCapture
+                  onLocationCaptured={handleLocationCaptured}
+                  autoCapture={false}
+                />
+
+                {studentLocation && (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>Location Ready</span>
+                    </div>
+                    <p className="text-sm text-green-700">
+                      Your location has been captured. When you submit, it will
+                      be verified against the classroom radius.
+                    </p>
+                    <div className="mt-2 text-xs text-green-600 font-mono">
+                      📍 {studentLocation.latitude.toFixed(6)},{" "}
+                      {studentLocation.longitude.toFixed(6)}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2">
               <Button
                 variant="outline"
-                onClick={() => setCodeDialogOpen(false)}
+                onClick={() => {
+                  setCodeDialogOpen(false);
+                  setStudentLocation(null);
+                }}
               >
                 Cancel
               </Button>
-              <Button onClick={handleCodeSubmit}>Submit</Button>
+              <Button onClick={handleCodeSubmit} disabled={!enteredCode.trim()}>
+                {studentLocation ? "Submit with Location ✓" : "Submit Code"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

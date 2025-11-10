@@ -9,8 +9,7 @@ import os
 from dotenv import load_dotenv
 import random
 import string
-from sqlalchemy.orm import Session
-
+import math
 
 app = FastAPI(title="Attendance Management API")
 
@@ -33,9 +32,33 @@ load_dotenv()
 DB_URL = os.getenv("DB_URL")
 engine = create_engine(DB_URL)
 
+# -------------------- IN-MEMORY LOCATION STORAGE --------------------
+# Store session locations temporarily (no database changes needed)
+session_locations = {}  # {session_id: {latitude, longitude, radius_meters}}
+
 # -------------------- HELPERS --------------------
 def generate_code(length: int = 6) -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Calculate distance between two GPS coordinates using Haversine formula.
+    Returns distance in meters.
+    """
+    # Convert to radians
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    
+    # Earth radius in meters
+    r = 6371000
+    
+    return c * r
 
 
 @app.get("/")
@@ -242,6 +265,15 @@ class MarkAttendanceRequest(BaseModel):
 class SubmitAttendanceCode(BaseModel):
     student_id: int
     code: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class StartSessionRequest(BaseModel):
+    class_id: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    radius_meters: Optional[int] = 50
 
 
 # -------------------- LOGIN --------------------
@@ -344,10 +376,16 @@ def delete_faculty_class(class_id: int):
 
 
 @app.post("/api/faculty/classes/{class_id}/sessions")
-def start_session(class_id: int):
-    """Start a new attendance session with generated code"""
+def start_session(class_id: int, request: StartSessionRequest = None):
+    """Start a new attendance session with generated code and optional location"""
     try:
+        # Handle both old API calls (no body) and new API calls (with location data)
+        if request is None:
+            request = StartSessionRequest(class_id=class_id)
+        
         print(f"[START_SESSION] Request to start session for class_id={class_id}")
+        if request.latitude and request.longitude:
+            print(f"[START_SESSION] Location provided: lat={request.latitude}, lon={request.longitude}, radius={request.radius_meters}m")
         
         with engine.connect() as conn:
             # Check if there's already an active session for this class
@@ -355,7 +393,7 @@ def start_session(class_id: int):
                 """
                 SELECT session_id, generated_code 
                 FROM attendance_sessions 
-                WHERE class_id = :class_id AND status = 'ACTIVE'
+                WHERE class_id = :class_id AND STATUS = 'ACTIVE'
                 LIMIT 1
                 """
             )
@@ -363,7 +401,11 @@ def start_session(class_id: int):
             
             if existing:
                 print(f"[START_SESSION] Active session already exists: session_id={existing.session_id}")
-                return dict(existing._mapping)
+                result = dict(existing._mapping)
+                # Add location from memory if available
+                if existing.session_id in session_locations:
+                    result.update(session_locations[existing.session_id])
+                return result
             
             # Create new session
             code = generate_code()
@@ -380,7 +422,20 @@ def start_session(class_id: int):
             conn.commit()
             
             result = dict(res.fetchone()._mapping)
-            print(f"[START_SESSION] Created session_id={result['session_id']}")
+            session_id = result['session_id']
+            print(f"[START_SESSION] Created session_id={session_id}")
+            
+            # Store location in memory if provided
+            if request.latitude and request.longitude:
+                session_locations[session_id] = {
+                    'latitude': request.latitude,
+                    'longitude': request.longitude,
+                    'radius_meters': request.radius_meters
+                }
+                result['latitude'] = request.latitude
+                result['longitude'] = request.longitude
+                result['radius_meters'] = request.radius_meters
+                print(f"[START_SESSION] Location stored in memory for session {session_id}")
             
             # Get class name and enrolled students
             class_sql = text("SELECT class_name FROM classes WHERE class_id = :cid")
@@ -522,6 +577,11 @@ def end_session(class_id: int, session_id: int):
                     related_class_id=class_id,
                     related_session_id=session_id
                 )
+            
+            # Clean up location data from memory
+            if session_id in session_locations:
+                del session_locations[session_id]
+                print(f"[END_SESSION] Cleaned up location data for session {session_id}")
             
             print(f"[END_SESSION] Session closed successfully, notifications sent")
             return dict(row._mapping)
@@ -853,7 +913,7 @@ def join_class(join_data: JoinClassRequest):
         raise HTTPException(status_code=500, detail=f"Database error: {type(e).__name__}: {str(e)}")
 
 
-# Student submits code (PRESENT)
+# Student submits code with optional location validation
 @app.post("/attendance/submit-code")
 def submit_code(payload: SubmitAttendanceCode):
     try:
@@ -871,6 +931,12 @@ def submit_code(payload: SubmitAttendanceCode):
                 raise HTTPException(status_code=400, detail="Invalid or expired code")
             session_id = session.session_id
             class_id = session.class_id
+            
+            # Get location from memory if available
+            location_data = session_locations.get(session_id, {})
+            session_lat = location_data.get('latitude')
+            session_lon = location_data.get('longitude')
+            radius_meters = location_data.get('radius_meters', 50)
 
             sql_enroll = text(
                 "SELECT 1 FROM class_enrollments WHERE student_id = :sid AND class_id = :cid"
@@ -878,27 +944,59 @@ def submit_code(payload: SubmitAttendanceCode):
             if not conn.execute(
                 sql_enroll, {"sid": payload.student_id, "cid": class_id}
             ).fetchone():
-                raise HTTPException(status_code=403, detail="Student not enrolled")
+                raise HTTPException(status_code=403, detail="Student not enrolled in this class")
 
-            # Upsert (update first, else insert)
+            # Determine status based on location if session has location
+            status = "PRESENT"
+            distance = None
+            location_message = ""
+            
+            if session_lat and session_lon:
+                # Session has location requirement
+                if payload.latitude and payload.longitude:
+                    # Student provided location - calculate distance
+                    distance = calculate_distance(
+                        session_lat, session_lon,
+                        payload.latitude, payload.longitude
+                    )
+                    
+                    print(f"[LOCATION_CHECK] Session: ({session_lat}, {session_lon})")
+                    print(f"[LOCATION_CHECK] Student: ({payload.latitude}, {payload.longitude})")
+                    print(f"[LOCATION_CHECK] Distance: {distance:.2f}m, Radius: {radius_meters}m")
+                    
+                    if distance > radius_meters:
+                        status = "ABSENT"
+                        location_message = f" - Outside zone (Distance: {distance:.0f}m, Allowed: {radius_meters}m)"
+                        print(f"[LOCATION_CHECK] Student is OUTSIDE the allowed radius")
+                    else:
+                        location_message = f" - Within zone ({distance:.0f}m)"
+                        print(f"[LOCATION_CHECK] Student is WITHIN the allowed radius")
+                else:
+                    # Session requires location but student didn't provide it
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Location is required for this session. Please enable location services."
+                    )
+
+            # Upsert attendance record
             update_sql = text(
                 """
                 UPDATE attendance_records
-                SET status = 'PRESENT', marked_at = NOW()
+                SET status = :status, marked_at = NOW()
                 WHERE session_id = :ses AND student_id = :sid
                 """
             )
             res = conn.execute(
-                update_sql, {"ses": session_id, "sid": payload.student_id}
+                update_sql, {"status": status, "ses": session_id, "sid": payload.student_id}
             )
             if res.rowcount == 0:
                 insert_sql = text(
                     """
                     INSERT INTO attendance_records (session_id, student_id, status, marked_at)
-                    VALUES (:ses, :sid, 'PRESENT', NOW())
+                    VALUES (:ses, :sid, :status, NOW())
                     """
                 )
-                conn.execute(insert_sql, {"ses": session_id, "sid": payload.student_id})
+                conn.execute(insert_sql, {"ses": session_id, "sid": payload.student_id, "status": status})
 
             conn.commit()
             
@@ -907,19 +1005,34 @@ def submit_code(payload: SubmitAttendanceCode):
             class_info = conn.execute(class_sql, {"cid": class_id}).fetchone()
             if class_info:
                 class_name = class_info[0]
-                create_notification(
-                    user_id=payload.student_id,
-                    type="attendance_marked",
-                    title="Attendance Confirmed",
-                    message=f"Your attendance has been recorded as PRESENT for {class_name}",
-                    priority="low"
-                )
+                if status == "ABSENT":
+                    create_notification(
+                        user_id=payload.student_id,
+                        type="attendance_marked",
+                        title="Attendance: Outside Zone",
+                        message=f"You were outside the classroom radius for {class_name}{location_message}",
+                        priority="high"
+                    )
+                else:
+                    create_notification(
+                        user_id=payload.student_id,
+                        type="attendance_marked",
+                        title="Attendance Confirmed",
+                        message=f"Your attendance has been recorded as {status} for {class_name}{location_message}",
+                        priority="low"
+                    )
             
             return {
-                "message": "Attendance marked successfully",
+                "message": f"Attendance marked as {status}{location_message}",
                 "session_id": session_id,
+                "status": status,
+                "distance": round(distance, 2) if distance else None,
+                "within_radius": status == "PRESENT"
             }
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[SUBMIT_CODE_ERROR] {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1223,47 +1336,3 @@ def create_notification(
     except Exception as e:
         print(f"[NOTIFICATION] Failed to create notification: {str(e)}")
 
-#------------Registration Endpoint-----------------
-#------------Registration Endpoint-----------------
-
-class UserRegister(BaseModel):
-    name: str
-    email: str
-    password: str
-    role: str
-    roll_number: int | None = None
-
-
-@app.post("/register")
-def register_user(user: UserRegister):
-    try:
-        with engine.connect() as conn:
-            # Check if email exists
-            existing = conn.execute(
-                text("SELECT * FROM users WHERE email = :email"),
-                {"email": user.email}
-            ).fetchone()
-
-            if existing:
-                raise HTTPException(status_code=400, detail="Email already registered")
-
-            # Insert user (plain password as login expects)
-            conn.execute(
-                text("""
-                    INSERT INTO users (name, email, password_hash, role, roll_number)
-                    VALUES (:name, :email, :password, :role, :roll_number)
-                """),
-                {
-                    "name": user.name,
-                    "email": user.email,
-                    "password": user.password,
-                    "role": user.role,
-                    "roll_number": user.roll_number,
-                }
-            )
-
-            conn.commit()
-            return {"message": "User registered successfully"}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
