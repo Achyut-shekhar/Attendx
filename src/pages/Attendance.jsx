@@ -81,32 +81,89 @@ const Attendance = () => {
 
       {/* ✅ Session Status Card */}
       {session && (
-        <Card className="mb-6 p-4 bg-blue-50">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="font-semibold">Status:</span>
-              <p className="text-blue-600 font-bold">{session.status}</p>
+        <Card className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800 shadow-md">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-blue-600 dark:text-blue-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Status
+                </p>
+                <p className="text-lg font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                  {session.status === "ACTIVE" && (
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                  )}
+                  {session.status}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="font-semibold">Started:</span>
-              <p className="text-sm">
-                {new Date(session.start_time).toLocaleString()}
-              </p>
+
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-indigo-600 dark:text-indigo-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Started
+                </p>
+                <p className="text-base font-semibold text-foreground">
+                  {new Date(session.start_time).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="font-semibold">Students:</span>
-              <p className="text-sm">{students.length} enrolled</p>
-            </div>
-            <div>
-              <span className="font-semibold">Marked:</span>
-              <p className="text-sm">
-                {
-                  attendance.filter(
-                    (a) => a.session_id == sessionId && a.status === "PRESENT"
-                  ).length
-                }{" "}
-                present
-              </p>
+
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0 w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-purple-600 dark:text-purple-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Students
+                </p>
+                <p className="text-base font-semibold text-foreground">
+                  {students.length}{" "}
+                  <span className="text-sm text-muted-foreground">
+                    enrolled
+                  </span>
+                </p>
+              </div>
             </div>
           </div>
         </Card>
@@ -116,7 +173,6 @@ const Attendance = () => {
         <TabsList>
           <TabsTrigger value="manual">Manual Attendance</TabsTrigger>
           <TabsTrigger value="code">Code Generation</TabsTrigger>
-         
         </TabsList>
 
         {/* ✅ Manual Attendance */}

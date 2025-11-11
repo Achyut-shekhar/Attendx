@@ -419,7 +419,7 @@ const StudentDashboard = () => {
               <CardHeader>
                 <div className="flex justify-between">
                   <CardTitle>{c.name}</CardTitle>
-                  <Badge>{c.attendanceRate}%</Badge>
+                  <Badge>{c.attendanceRate.toFixed(2)}%</Badge>
                 </div>
                 <CardDescription>{c.facultyName}</CardDescription>
               </CardHeader>

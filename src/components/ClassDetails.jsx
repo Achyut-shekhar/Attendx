@@ -37,6 +37,7 @@ const ClassDetails = ({ classItem }) => {
   --------------------------------------------------- */
   const loadSessions = async () => {
     try {
+      setLoading(true);
       const list = await facultyAPI.getSessionsByDate(
         classItem.class_id,
         selectedDate
@@ -51,6 +52,7 @@ const ClassDetails = ({ classItem }) => {
         setSelectedSession(null);
         setRows([]);
         setTotals({ present: 0, late: 0, absent: 0 });
+        setLoading(false); // Clear loading when no sessions
       }
     } catch (err) {
       console.error("[ClassDetails] Error loading sessions:", err);
@@ -59,6 +61,7 @@ const ClassDetails = ({ classItem }) => {
         description: "Failed to load sessions.",
         variant: "destructive",
       });
+      setLoading(false); // Clear loading on error
     }
   };
 
@@ -163,9 +166,11 @@ const ClassDetails = ({ classItem }) => {
               {/* Session Dropdown */}
               {sessions.length > 0 && (
                 <div className="mb-4">
-                  <label className="text-sm font-medium">Select Session</label>
+                  <label className="text-sm font-medium text-foreground">
+                    Select Session
+                  </label>
                   <select
-                    className="border rounded-md w-full p-2 mt-1"
+                    className="border rounded-md w-full p-2 mt-1 bg-background text-foreground border-input focus:ring-2 focus:ring-ring"
                     value={selectedSession || ""}
                     onChange={(e) => setSelectedSession(Number(e.target.value))}
                   >

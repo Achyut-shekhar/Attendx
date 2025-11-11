@@ -76,11 +76,21 @@ const ClassCard = ({
                     ? "destructive"
                     : "secondary"
                 }
+                className={
+                  status === "active"
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : ""
+                }
               >
                 {status === "ended" ? (
                   <span className="flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                    <CheckCircle className="h-4 w-4 mr-1 text-green-600 dark:text-green-400" />
                     Ended
+                  </span>
+                ) : status === "active" ? (
+                  <span className="flex items-center capitalize">
+                    <span className="h-2 w-2 mr-1.5 bg-white rounded-full animate-pulse"></span>
+                    Active
                   </span>
                 ) : (
                   status
