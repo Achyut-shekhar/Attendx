@@ -20,61 +20,78 @@ export default function LocationCapture({
     setStatus("loading");
     setError("");
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const locationData = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        };
-        setLocation(locationData);
-        setStatus("success");
-        if (onLocationCaptured) {
-          onLocationCaptured(locationData);
-        }
-      },
-      (err) => {
-        setStatus("error");
-        let errorMsg = "Failed to get location";
+    const attemptCapture = (highAccuracy, timeout, isRetry = false) => {
+      console.log(
+        `Attempting location capture: highAccuracy=${highAccuracy}, timeout=${timeout}ms, isRetry=${isRetry}`
+      );
 
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            errorMsg =
-              "Location access denied. Please enable location permissions.";
-            break;
-          case err.POSITION_UNAVAILABLE:
-            errorMsg = "Location information is unavailable.";
-            break;
-          case err.TIMEOUT:
-            errorMsg = "Location request timed out.";
-            break;
-          default:
-            errorMsg = `Error getting location: ${err.message}`;
-        }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          };
+          console.log("Location captured successfully:", locationData);
+          setLocation(locationData);
+          setStatus("success");
+          if (onLocationCaptured) {
+            onLocationCaptured(locationData);
+          }
+        },
+        (err) => {
+          console.error("Geolocation error:", err);
 
-        setError(errorMsg);
-        console.error("Geolocation error:", err);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
+          // If high accuracy timed out and this isn't already a retry, try again with low accuracy
+          if (err.code === err.TIMEOUT && highAccuracy && !isRetry) {
+            console.log(
+              "High accuracy timed out, retrying with low accuracy..."
+            );
+            setError("Getting approximate location...");
+            attemptCapture(false, 30000, true);
+            return;
+          }
+
+          setStatus("error");
+          let errorMsg = "Failed to get location. ";
+
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              errorMsg +=
+                "Please allow location access in your browser settings.";
+              break;
+            case err.POSITION_UNAVAILABLE:
+              errorMsg +=
+                "Location information is unavailable. Try enabling Wi-Fi or moving near a window.";
+              break;
+            case err.TIMEOUT:
+              errorMsg +=
+                "Location request timed out. Make sure Wi-Fi is enabled and you're near a window. On desktop/laptop, location may take longer.";
+              break;
+            default:
+              errorMsg += `Error: ${err.message}`;
+          }
+
+          setError(errorMsg);
+        },
+        {
+          enableHighAccuracy: highAccuracy,
+          timeout: timeout,
+          maximumAge: 0,
+        }
+      );
+    };
+
+    // Start with high accuracy and 60 second timeout
+    attemptCapture(true, 60000, false);
   };
-
-  useEffect(() => {
-    if (autoCapture) {
-      captureLocation();
-    }
-  }, [autoCapture]);
 
   return (
     <div className="space-y-4">
       {status === "idle" && (
         <button
           onClick={captureLocation}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
           <MapPin className="w-4 h-4" />
           Capture Location

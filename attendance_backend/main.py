@@ -244,6 +244,13 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str  # "STUDENT" or "FACULTY"
+
+
 class CreateClassRequest(BaseModel):
     class_name: str
     section: str = "A"
@@ -295,6 +302,73 @@ def login(request: LoginRequest):
             "name": user["name"],
             "role": user["role"],
         }
+
+
+@app.post("/register")
+def register(request: RegisterRequest):
+    """Register a new user (student or faculty)"""
+    try:
+        print(f"[REGISTER] Attempting to register: {request.email}, role={request.role}")
+        
+        # Validate role
+        if request.role not in ["STUDENT", "FACULTY"]:
+            raise HTTPException(status_code=400, detail="Role must be STUDENT or FACULTY")
+        
+        with engine.connect() as conn:
+            # Check if email already exists
+            check_sql = text("SELECT user_id FROM users WHERE email = :email")
+            existing = conn.execute(check_sql, {"email": request.email}).fetchone()
+            
+            if existing:
+                print(f"[REGISTER] Email already exists: {request.email}")
+                raise HTTPException(status_code=400, detail="Email already registered")
+            
+            # Insert new user
+            insert_sql = text(
+                """
+                INSERT INTO users (name, email, password_hash, role)
+                VALUES (:name, :email, :password, :role)
+                RETURNING user_id, name, email, role
+                """
+            )
+            result = conn.execute(
+                insert_sql,
+                {
+                    "name": request.name,
+                    "email": request.email,
+                    "password": request.password,  # In production, hash this!
+                    "role": request.role
+                }
+            )
+            conn.commit()
+            
+            user = dict(result.fetchone()._mapping)
+            print(f"[REGISTER] Successfully registered user_id={user['user_id']}")
+            
+            # Create welcome notification
+            create_notification(
+                user_id=user['user_id'],
+                type="welcome",
+                title="Welcome!",
+                message=f"Welcome to the Attendance Management System, {user['name']}!",
+                priority="low"
+            )
+            
+            return {
+                "message": "Registration successful",
+                "user_id": user["user_id"],
+                "name": user["name"],
+                "email": user["email"],
+                "role": user["role"]
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[REGISTER] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # -------------------- FACULTY --------------------
