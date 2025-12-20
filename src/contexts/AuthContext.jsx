@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/use-toast";
 
 const AuthContext = createContext();
@@ -14,20 +15,23 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const { toast } = useToast();
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
 
   // ✅ Restore session from localStorage
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
-    if (savedUser) {
+    const savedToken = localStorage.getItem("token");
+    if (savedUser && savedToken) {
       setUser(JSON.parse(savedUser));
+      setToken(savedToken);
     }
     setIsLoading(false);
   }, []);
 
-  // ✅ Login function (connects to backend)
-  const login = async (email, password, role) => {
+  // ✅ Login function (connects to backend with JWT)
+  const login = async (email, password) => {
     setIsLoading(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -49,12 +53,14 @@ export const AuthProvider = ({ children }) => {
       const userInfo = {
         user_id: data.user_id,
         name: data.name,
-        email: email,
+        email: data.email,
         role: data.role,
       };
 
-      // ✅ Save locally
+      // ✅ Save token and user info locally
+      localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(userInfo));
+      setToken(data.access_token);
       setUser(userInfo);
 
       toast({
@@ -79,7 +85,9 @@ export const AuthProvider = ({ children }) => {
   // ✅ Logout clears data
   const logout = () => {
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     setUser(null);
+    setToken(null);
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out",
@@ -89,6 +97,7 @@ export const AuthProvider = ({ children }) => {
   // ✅ Context shared across the app
   const value = {
     user,
+    token,
     isLoading,
     login,
     logout,

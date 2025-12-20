@@ -5,7 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/enhanced-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Card,
   CardContent,
@@ -24,7 +23,6 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    role: "STUDENT",
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -53,25 +51,15 @@ const Login = () => {
     }
 
     try {
-      const success = await login(
-        formData.email,
-        formData.password,
-        formData.role
-      );
+      const success = await login(formData.email, formData.password);
 
       if (success) {
         toast({
           title: "Welcome back!",
-          description: `You are logged in as ${formData.role}`,
+          description: "You have successfully logged in",
         });
 
-        if (formData.role === "STUDENT") {
-          navigate("/student-dashboard", { replace: true });
-        } else if (formData.role === "FACULTY") {
-          navigate("/faculty-dashboard", { replace: true });
-        } else {
-          navigate("/", { replace: true });
-        }
+        // Navigation will be handled by AuthContext based on user role
       } else {
         setError("Invalid email or password");
         toast({
@@ -114,27 +102,6 @@ const Login = () => {
               )}
 
               <div className="space-y-4">
-                {/* Role selection */}
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <RadioGroup
-                    defaultValue={formData.role}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, role: value })
-                    }
-                    className="flex space-x-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="STUDENT" id="student" />
-                      <Label htmlFor="student">Student</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="FACULTY" id="faculty" />
-                      <Label htmlFor="faculty">Faculty</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
                 {/* Email input */}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>

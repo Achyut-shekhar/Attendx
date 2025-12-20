@@ -30,10 +30,11 @@ const Register = () => {
     name: "",
     email: "",
     password: "",
+    confirmPassword: "",
     role: "STUDENT",
-    roll_number: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -44,8 +45,14 @@ const Register = () => {
 
     try {
       // Basic validation
-      if (!formData.name || !formData.email || !formData.password) {
+      if (
+        !formData.name ||
+        !formData.email ||
+        !formData.password ||
+        !formData.confirmPassword
+      ) {
         setError("Please fill in all required fields");
+        setIsLoading(false);
         return;
       }
 
@@ -53,25 +60,27 @@ const Register = () => {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
         setError("Please enter a valid email address");
+        setIsLoading(false);
         return;
       }
 
       // Password validation (at least 6 characters)
       if (formData.password.length < 6) {
         setError("Password must be at least 6 characters long");
+        setIsLoading(false);
         return;
       }
 
-      // Convert roll_number to integer if provided
-      const userData = {
-        ...formData,
-        roll_number: formData.roll_number
-          ? parseInt(formData.roll_number)
-          : null,
-      };
+      // Check if passwords match
+      if (formData.password !== formData.confirmPassword) {
+        setError("Passwords do not match");
+        setIsLoading(false);
+        return;
+      }
 
-      // Register user
-      await authApi.register(userData);
+      // Register user (remove confirmPassword from request)
+      const { confirmPassword, ...registerData } = formData;
+      await authApi.register(registerData);
 
       // Show success message
       toast({
@@ -176,6 +185,36 @@ const Register = () => {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    className="pl-10 pr-10"
+                    value={formData.confirmPassword}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        confirmPassword: e.target.value,
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-3"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Role</Label>
                 <RadioGroup
                   value={formData.role}
@@ -194,28 +233,6 @@ const Register = () => {
                   </div>
                 </RadioGroup>
               </div>
-
-              {formData.role === "STUDENT" && (
-                <div className="space-y-2">
-                  <Label htmlFor="roll_number">Roll Number</Label>
-                  <div className="relative">
-                    <GraduationCap className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="roll_number"
-                      type="number"
-                      placeholder="12345"
-                      className="pl-10"
-                      value={formData.roll_number}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          roll_number: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              )}
 
               <Button
                 type="submit"

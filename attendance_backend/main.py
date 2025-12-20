@@ -1,5 +1,6 @@
 # main.py
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 import queries
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,18 @@ from dotenv import load_dotenv
 import random
 import string
 import math
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+# JWT Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
 
 app = FastAPI(title="Attendance Management API")
 
@@ -39,6 +52,42 @@ session_locations = {}  # {session_id: {latitude, longitude, radius_meters}}
 # -------------------- HELPERS --------------------
 def generate_code(length: int = 6) -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a password"""
+    return pwd_context.hash(password)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create JWT access token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify JWT token and return user data"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("sub")
+        role: str = payload.get("role")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        return {"user_id": user_id, "role": role}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
 
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -286,22 +335,51 @@ class StartSessionRequest(BaseModel):
 # -------------------- LOGIN --------------------
 @app.post("/login")
 def login(request: LoginRequest):
-    with engine.connect() as conn:
-        q = text(
-            "SELECT user_id, name, email, password_hash, role FROM users WHERE email = :email"
-        )
-        row = conn.execute(q, {"email": request.email}).fetchone()
-        if not row:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        user = dict(row._mapping)
-        if request.password != user["password_hash"]:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        return {
-            "message": "Login successful",
-            "user_id": user["user_id"],
-            "name": user["name"],
-            "role": user["role"],
-        }
+    """Login with email and password, returns JWT token"""
+    try:
+        with engine.connect() as conn:
+            q = text(
+                "SELECT user_id, name, email, password_hash, role FROM users WHERE email = :email"
+            )
+            row = conn.execute(q, {"email": request.email}).fetchone()
+            if not row:
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+            user = dict(row._mapping)
+            
+            # Verify password - support both plain text (old) and bcrypt (new)
+            password_valid = False
+            if user["password_hash"].startswith("$2b$"):
+                # Bcrypt hash
+                password_valid = verify_password(request.password, user["password_hash"])
+            else:
+                # Plain text (legacy - for backward compatibility)
+                password_valid = (request.password == user["password_hash"])
+            
+            if not password_valid:
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+            # Create JWT token
+            access_token = create_access_token(
+                data={"sub": user["user_id"], "role": user["role"], "email": user["email"]}
+            )
+            
+            return {
+                "message": "Login successful",
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user_id": user["user_id"],
+                "name": user["name"],
+                "email": user["email"],
+                "role": user["role"],
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[LOGIN] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/register")
@@ -314,6 +392,10 @@ def register(request: RegisterRequest):
         if request.role not in ["STUDENT", "FACULTY"]:
             raise HTTPException(status_code=400, detail="Role must be STUDENT or FACULTY")
         
+        # Validate password length
+        if len(request.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+        
         with engine.connect() as conn:
             # Check if email already exists
             check_sql = text("SELECT user_id FROM users WHERE email = :email")
@@ -322,6 +404,9 @@ def register(request: RegisterRequest):
             if existing:
                 print(f"[REGISTER] Email already exists: {request.email}")
                 raise HTTPException(status_code=400, detail="Email already registered")
+            
+            # Hash the password
+            hashed_password = get_password_hash(request.password)
             
             # Insert new user
             insert_sql = text(
@@ -336,7 +421,7 @@ def register(request: RegisterRequest):
                 {
                     "name": request.name,
                     "email": request.email,
-                    "password": request.password,  # In production, hash this!
+                    "password": hashed_password,
                     "role": request.role
                 }
             )
