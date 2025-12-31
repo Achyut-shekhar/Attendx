@@ -92,12 +92,12 @@ const Register = () => {
       navigate("/login");
     } catch (error) {
       console.error("Registration error:", error);
-      setError(
-        error.response?.data?.detail || "An error occurred during registration"
-      );
+      const errorMessage =
+        error.message || "An error occurred during registration";
+      setError(errorMessage);
       toast({
         title: "Registration Failed",
-        description: error.response?.data?.detail || "Please try again",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -234,13 +234,8 @@ const Register = () => {
                 </RadioGroup>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                loading={isLoading}
-                disabled={isLoading}
-              >
-                Register
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Registering..." : "Register"}
               </Button>
 
               <div className="text-center text-sm">

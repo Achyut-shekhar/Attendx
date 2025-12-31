@@ -15,6 +15,9 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+# Load environment variables first
+load_dotenv()
+
 # JWT Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
 ALGORITHM = "HS256"
@@ -27,6 +30,9 @@ security = HTTPBearer()
 app = FastAPI(title="Attendance Management API")
 
 # -------------------- CORS --------------------
+# Get frontend URL from environment variable or use defaults
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -34,6 +40,8 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        FRONTEND_URL,
+        "*",  # Allow all origins (can be restricted in production)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -41,9 +49,11 @@ app.add_middleware(
 )
 
 # -------------------- ENV & DB --------------------
-load_dotenv()
+# Already loaded above
 DB_URL = os.getenv("DB_URL")
-engine = create_engine(DB_URL)
+if not DB_URL:
+    raise RuntimeError("DB_URL not found — set it in your .env file")
+engine = create_engine(DB_URL, pool_pre_ping=True)
 
 # -------------------- IN-MEMORY LOCATION STORAGE --------------------
 # Store session locations temporarily (no database changes needed)
@@ -56,11 +66,19 @@ def generate_code(length: int = 6) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
+    # Truncate password to 72 bytes to avoid bcrypt errors
+    if len(plain_password.encode('utf-8')) > 72:
+        plain_password = plain_password[:72]
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""
+    # Truncate password to 72 bytes to avoid bcrypt errors
+    print(f"[DEBUG] Hashing password, original length: {len(password)}, bytes: {len(password.encode('utf-8'))}")
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]
+        print(f"[DEBUG] Truncated password to length: {len(password)}, bytes: {len(password.encode('utf-8'))}")
     return pwd_context.hash(password)
 
 
@@ -337,6 +355,11 @@ class StartSessionRequest(BaseModel):
 def login(request: LoginRequest):
     """Login with email and password, returns JWT token"""
     try:
+        # Truncate password to 72 bytes (bcrypt limit) to avoid errors
+        password = request.password
+        if len(password.encode('utf-8')) > 72:
+            password = password[:72]
+        
         with engine.connect() as conn:
             q = text(
                 "SELECT user_id, name, email, password_hash, role FROM users WHERE email = :email"
@@ -351,10 +374,10 @@ def login(request: LoginRequest):
             password_valid = False
             if user["password_hash"].startswith("$2b$"):
                 # Bcrypt hash
-                password_valid = verify_password(request.password, user["password_hash"])
+                password_valid = verify_password(password, user["password_hash"])
             else:
                 # Plain text (legacy - for backward compatibility)
-                password_valid = (request.password == user["password_hash"])
+                password_valid = (password == user["password_hash"])
             
             if not password_valid:
                 raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -396,6 +419,11 @@ def register(request: RegisterRequest):
         if len(request.password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
         
+        # Truncate password to 72 bytes (bcrypt limit)
+        password = request.password
+        if len(password.encode('utf-8')) > 72:
+            password = password[:72]
+        
         with engine.connect() as conn:
             # Check if email already exists
             check_sql = text("SELECT user_id FROM users WHERE email = :email")
@@ -406,7 +434,7 @@ def register(request: RegisterRequest):
                 raise HTTPException(status_code=400, detail="Email already registered")
             
             # Hash the password
-            hashed_password = get_password_hash(request.password)
+            hashed_password = get_password_hash(password)
             
             # Insert new user
             insert_sql = text(

@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
-  const { login, user, isLoading } = useAuth();
+  const { login, user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -27,6 +27,7 @@ const Login = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Redirect if already logged in
   if (user) {
@@ -44,13 +45,16 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
 
     if (!formData.email || !formData.password) {
       setError("Please fill in all fields");
+      setIsLoading(false);
       return;
     }
 
     try {
+      setIsLoading(true);
       const success = await login(formData.email, formData.password);
 
       if (success) {
@@ -76,6 +80,8 @@ const Login = () => {
         description: "Could not reach backend API",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
