@@ -133,6 +133,16 @@ def root():
     return {"message": "Attendance API is up. See /docs for endpoints."}
 
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring"""
+    return {
+        "status": "healthy",
+        "service": "Attendance Management API",
+        "database": "connected"
+    }
+
+
 # -------------------- EXISTING READS (from queries.py) --------------------
 @app.get("/sessions/{date}")
 def sessions_by_date(date: str):
