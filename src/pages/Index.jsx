@@ -21,7 +21,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <GraduationCap className="h-8 w-8 text-primary-foreground" />
-            <h1 className="text-2xl font-bold text-primary-foreground">EduAttend</h1>
+            <h1 className="text-2xl font-bold text-primary-foreground">AttendX</h1>
           </div>
           <div className="flex items-center space-x-4">
             {/* Theme Toggle */}
@@ -115,7 +115,7 @@ const Index = () => {
       <footer className="bg-card/10 backdrop-blur-sm border-t border-primary-foreground/20 py-8">
         <div className="container mx-auto px-4 text-center">
           <p className="text-primary-foreground/60">
-            © 2024 EduAttend. Built for modern educational institutions.
+            © 2024 AttendX. Built for modern educational institutions.
           </p>
         </div>
       </footer>

@@ -93,7 +93,7 @@ const Login = () => {
             <div className="flex justify-center mb-4">
               <GraduationCap className="h-12 w-12 text-primary" />
             </div>
-            <CardTitle className="text-3xl font-bold">EduAttend</CardTitle>
+            <CardTitle className="text-3xl font-bold">AttendX</CardTitle>
             <CardDescription className="text-lg">
               Attendance Management System
             </CardDescription>
