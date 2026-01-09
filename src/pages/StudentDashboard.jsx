@@ -42,13 +42,17 @@ const monthNames = [
 
 // ✅ Calendar Component with stats and session counts
 const AttendanceCalendar = ({
-  records,
-  sessionCounts = {},
-  initialYear = 2025,
-  initialMonth = 9,
+  calendarByMonth = {},
+  sessionCountsByMonth = {},
+  initialYear = new Date().getFullYear(),
+  initialMonth = new Date().getMonth() + 1,
 }) => {
   const [year, setYear] = React.useState(initialYear);
   const [month, setMonth] = React.useState(initialMonth);
+
+  const monthKey = `${year}-${month}`;
+  const records = calendarByMonth[monthKey] || {};
+  const sessionCounts = sessionCountsByMonth[monthKey] || {};
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDay = new Date(year, month - 1, 1).getDay();
@@ -103,7 +107,14 @@ const AttendanceCalendar = ({
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-2">
         <button
-          onClick={() => setMonth(month === 1 ? 12 : month - 1)}
+          onClick={() => {
+            if (month === 1) {
+              setMonth(12);
+              setYear(year - 1);
+            } else {
+              setMonth(month - 1);
+            }
+          }}
           className="p-1 rounded hover:bg-muted"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -112,7 +123,14 @@ const AttendanceCalendar = ({
           {monthNames[month - 1]} {year}
         </span>
         <button
-          onClick={() => setMonth(month === 12 ? 1 : month + 1)}
+          onClick={() => {
+            if (month === 12) {
+              setMonth(1);
+              setYear(year + 1);
+            } else {
+              setMonth(month + 1);
+            }
+          }}
           className="p-1 rounded hover:bg-muted"
         >
           <ChevronRight className="h-5 w-5" />
@@ -251,39 +269,53 @@ const StudentDashboard = () => {
     try {
       const records = await studentAPI.getAttendanceRecords(classItem.id);
 
-      const calendar = {};
-      const sessionCounts = {}; // Track sessions per day
+      // Group records by year-month, then by day
+      const calendarByMonth = {};
+      const sessionCountsByMonth = {};
 
       records.forEach((record) => {
         const date = new Date(record.recorded_at);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1; // 1-12
         const day = date.getDate();
+        const monthKey = `${year}-${month}`;
 
-        // Initialize day data if not exists
-        if (!sessionCounts[day]) {
-          sessionCounts[day] = { total: 0, present: 0 };
+        // Initialize month data if not exists
+        if (!calendarByMonth[monthKey]) {
+          calendarByMonth[monthKey] = {};
+          sessionCountsByMonth[monthKey] = {};
         }
 
-        sessionCounts[day].total++;
+        // Initialize day data if not exists
+        if (!sessionCountsByMonth[monthKey][day]) {
+          sessionCountsByMonth[monthKey][day] = { total: 0, present: 0 };
+        }
+
+        sessionCountsByMonth[monthKey][day].total++;
         if (record.status === "PRESENT" || record.status === "LATE") {
-          sessionCounts[day].present++;
+          sessionCountsByMonth[monthKey][day].present++;
         }
 
         // Mark calendar day status based on majority
         // If at least one present, show green; if all absent, show red
-        if (sessionCounts[day].present > 0) {
-          calendar[day] = "present";
+        if (sessionCountsByMonth[monthKey][day].present > 0) {
+          calendarByMonth[monthKey][day] = "present";
         } else {
-          calendar[day] = "absent";
+          calendarByMonth[monthKey][day] = "absent";
         }
       });
 
-      console.log("[StudentDashboard] Final calendar:", calendar);
-      console.log("[StudentDashboard] Final sessionCounts:", sessionCounts);
+      console.log("[StudentDashboard] Calendar by month:", calendarByMonth);
+      console.log("[StudentDashboard] Session counts by month:", sessionCountsByMonth);
 
-      setAttendanceRecords({ calendar, records, sessionCounts });
+      setAttendanceRecords({ 
+        calendarByMonth, 
+        sessionCountsByMonth,
+        records 
+      });
     } catch (error) {
       console.error("[StudentDashboard] Error fetching attendance:", error);
-      setAttendanceRecords({ calendar: {}, records: [], sessionCounts: {} });
+      setAttendanceRecords({ calendarByMonth: {}, sessionCountsByMonth: {}, records: [] });
     } finally {
       setRecordsLoading(false);
     }
@@ -520,8 +552,8 @@ const StudentDashboard = () => {
                         Calendar View
                       </h3>
                       <AttendanceCalendar
-                        records={attendanceRecords.calendar || {}}
-                        sessionCounts={attendanceRecords.sessionCounts || {}}
+                        calendarByMonth={attendanceRecords.calendarByMonth || {}}
+                        sessionCountsByMonth={attendanceRecords.sessionCountsByMonth || {}}
                       />
                     </div>
 

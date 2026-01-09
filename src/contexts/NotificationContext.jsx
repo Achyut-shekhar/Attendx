@@ -45,15 +45,17 @@ export const NotificationProvider = ({ children }) => {
     loadNotifications();
   }, [user?.user_id]);
 
-  // Periodic refresh disabled - notifications only load on mount or manual refresh
-  // useEffect(() => {
-  //   if (!user?.user_id) return;
-  //   const interval = setInterval(() => {
-  //     loadNotifications();
-  //     loadUnreadCount();
-  //   }, 30000);
-  //   return () => clearInterval(interval);
-  // }, [user?.user_id]);
+  // Periodic refresh - polls for new notifications every 30 seconds
+  useEffect(() => {
+    if (!user?.user_id) return;
+    
+    const interval = setInterval(() => {
+      loadNotifications();
+      loadUnreadCount();
+    }, 30000); // Poll every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [user?.user_id]);
 
   const markAsRead = async (notificationId) => {
     try {
