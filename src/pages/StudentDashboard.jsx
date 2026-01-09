@@ -306,16 +306,23 @@ const StudentDashboard = () => {
       });
 
       console.log("[StudentDashboard] Calendar by month:", calendarByMonth);
-      console.log("[StudentDashboard] Session counts by month:", sessionCountsByMonth);
+      console.log(
+        "[StudentDashboard] Session counts by month:",
+        sessionCountsByMonth
+      );
 
-      setAttendanceRecords({ 
-        calendarByMonth, 
+      setAttendanceRecords({
+        calendarByMonth,
         sessionCountsByMonth,
-        records 
+        records,
       });
     } catch (error) {
       console.error("[StudentDashboard] Error fetching attendance:", error);
-      setAttendanceRecords({ calendarByMonth: {}, sessionCountsByMonth: {}, records: [] });
+      setAttendanceRecords({
+        calendarByMonth: {},
+        sessionCountsByMonth: {},
+        records: [],
+      });
     } finally {
       setRecordsLoading(false);
     }
@@ -552,8 +559,12 @@ const StudentDashboard = () => {
                         Calendar View
                       </h3>
                       <AttendanceCalendar
-                        calendarByMonth={attendanceRecords.calendarByMonth || {}}
-                        sessionCountsByMonth={attendanceRecords.sessionCountsByMonth || {}}
+                        calendarByMonth={
+                          attendanceRecords.calendarByMonth || {}
+                        }
+                        sessionCountsByMonth={
+                          attendanceRecords.sessionCountsByMonth || {}
+                        }
                       />
                     </div>
 
