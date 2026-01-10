@@ -1,7 +1,20 @@
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -15,7 +28,13 @@ import { useToast } from "@/components/ui/use-toast";
  * NOTE: We don't fetch here anymore — Attendance.jsx already refreshes
  * all 3 blocks (session, students, attendance) every 3 seconds.
  */
-export default function CodeGeneration({ classId, sessionId, session, students = [], attendance = [] }) {
+export default function CodeGeneration({
+  classId,
+  sessionId,
+  session,
+  students = [],
+  attendance = [],
+}) {
   const { toast } = useToast();
   const code = session?.generated_code || "";
   const isClosed = session?.status === "CLOSED";
@@ -59,7 +78,8 @@ export default function CodeGeneration({ classId, sessionId, session, students =
       <CardHeader>
         <CardTitle>Code Generation Attendance</CardTitle>
         <CardDescription>
-          Shows the SAME code created when you started the session. Button is disabled after ending the session.
+          Shows the SAME code created when you started the session. Button is
+          disabled after ending the session.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -72,7 +92,10 @@ export default function CodeGeneration({ classId, sessionId, session, students =
             onClick={() => {
               if (code) {
                 navigator.clipboard.writeText(code);
-                toast({ title: "Copied", description: "Code copied to clipboard." });
+                toast({
+                  title: "Copied",
+                  description: "Code copied to clipboard.",
+                });
               }
             }}
             disabled={!code || isClosed}
@@ -86,13 +109,18 @@ export default function CodeGeneration({ classId, sessionId, session, students =
         </div>
 
         <div className="border-t pt-4">
-          <div className="text-sm text-muted-foreground mb-2">Enrolled Students</div>
+          <div className="text-sm text-muted-foreground mb-2">
+            Enrolled Students
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Roll Number</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead className="text-right">Status (this session)</TableHead>
+                <TableHead className="text-right">
+                  Status (this session)
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -100,6 +128,7 @@ export default function CodeGeneration({ classId, sessionId, session, students =
                 const present = isPresent(s);
                 return (
                   <TableRow key={s.user_id}>
+                    <TableCell>{s.roll_number || "—"}</TableCell>
                     <TableCell>{s.name}</TableCell>
                     <TableCell>{s.email}</TableCell>
                     <TableCell className="text-right">
@@ -112,7 +141,10 @@ export default function CodeGeneration({ classId, sessionId, session, students =
               })}
               {students.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={3}
+                    className="text-center text-muted-foreground"
+                  >
                     No students enrolled in this class yet.
                   </TableCell>
                 </TableRow>

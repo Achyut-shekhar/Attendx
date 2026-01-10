@@ -122,6 +122,14 @@ export const facultyAPI = {
     return data;
   },
 
+  // Get all sessions with attendance data for export (optimized)
+  async getAllSessionsWithAttendance(class_id) {
+    const { data } = await api.get(
+      `/faculty/classes/${class_id}/sessions/all-with-attendance`
+    );
+    return data;
+  },
+
   // ✅ Date-level — used ONLY for calendar view
   async getClassAttendanceByDate(class_id, date) {
     const { data } = await api.get(
@@ -146,13 +154,14 @@ export const studentAPI = {
     return data;
   },
 
-  async joinClass(join_code) {
+  async joinClass(join_code, roll_number) {
     const user = getUser();
     if (!user?.user_id) throw new Error("Not logged in as student");
 
     const { data } = await api.post(`/student/classes/join`, {
       join_code,
       student_id: user.user_id,
+      roll_number,
     });
     return data;
   },

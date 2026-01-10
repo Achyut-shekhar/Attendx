@@ -174,6 +174,7 @@ const StudentDashboard = () => {
   const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [joinCode, setJoinCode] = useState("");
+  const [rollNumber, setRollNumber] = useState("");
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
 
   const [selectedClass, setSelectedClass] = useState(null); // ✅ stores the class for which student enters code
@@ -244,13 +245,23 @@ const StudentDashboard = () => {
       return;
     }
 
+    if (!rollNumber.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your roll number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      await studentAPI.joinClass(joinCode);
+      await studentAPI.joinClass(joinCode, rollNumber);
       toast({
         title: "Successfully Joined",
         description: "You are now enrolled.",
       });
       setJoinCode("");
+      setRollNumber("");
       setIsJoinDialogOpen(false);
       fetchEnrolledClasses();
     } catch (error) {
@@ -430,12 +441,23 @@ const StudentDashboard = () => {
                 <DialogTitle>Join a Class</DialogTitle>
               </DialogHeader>
 
-              <div className="space-y-2 py-4">
-                <Label>Join Code</Label>
-                <Input
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                />
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Join Code</Label>
+                  <Input
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="Enter class join code"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Roll Number</Label>
+                  <Input
+                    value={rollNumber}
+                    onChange={(e) => setRollNumber(e.target.value)}
+                    placeholder="Enter your roll number"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2">

@@ -212,6 +212,7 @@ const ManualAttendance = ({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Roll Number</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="text-right">Mark Present</TableHead>
@@ -230,6 +231,7 @@ const ManualAttendance = ({
 
               return (
                 <TableRow key={s.user_id}>
+                  <TableCell>{s.roll_number || "—"}</TableCell>
                   <TableCell>{s.name}</TableCell>
                   <TableCell>{s.email}</TableCell>
                   <TableCell className="text-right">

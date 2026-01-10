@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import random
 import string
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -338,6 +338,7 @@ class CreateClassRequest(BaseModel):
 class JoinClassRequest(BaseModel):
     join_code: str
     student_id: int
+    roll_number: str  # Student's roll number for the class
 
 
 class MarkAttendanceRequest(BaseModel):
@@ -608,14 +609,19 @@ def start_session(class_id: int, request: StartSessionRequest = None):
             code = generate_code()
             print(f"[START_SESSION] Creating new session with code={code}")
             
+            # Get current time in IST (UTC+5:30) as timezone-naive datetime
+            utc_now = datetime.utcnow()
+            ist_offset = timedelta(hours=5, minutes=30)
+            current_time_ist = utc_now + ist_offset
+            
             sql = text(
                 """
                 INSERT INTO attendance_sessions (class_id, start_time, status, generated_code)
-                VALUES (:class_id, NOW(), 'ACTIVE', :code)
+                VALUES (:class_id, :start_time, 'ACTIVE', :code)
                 RETURNING session_id, class_id, start_time, status, generated_code
                 """
             )
-            res = conn.execute(sql, {"class_id": class_id, "code": code})
+            res = conn.execute(sql, {"class_id": class_id, "start_time": current_time_ist, "code": code})
             conn.commit()
             
             result = dict(res.fetchone()._mapping)
@@ -694,16 +700,21 @@ def end_session(class_id: int, session_id: int):
             print(f"[END_SESSION] Marked {absent_count} students as ABSENT")
             
             # Then update the session status
+            # Get current time in IST (UTC+5:30) as timezone-naive datetime
+            utc_now = datetime.utcnow()
+            ist_offset = timedelta(hours=5, minutes=30)
+            current_time_ist = utc_now + ist_offset
+            
             sql = text(
                 """
                 UPDATE attendance_sessions
-                SET end_time = NOW(), status = 'CLOSED'
+                SET end_time = :end_time, status = 'CLOSED'
                 WHERE session_id = :session_id AND class_id = :class_id
                 RETURNING *
                 """
             )
             row = conn.execute(
-                sql, {"session_id": session_id, "class_id": class_id}
+                sql, {"session_id": session_id, "class_id": class_id, "end_time": current_time_ist}
             ).fetchone()
             conn.commit()
             
@@ -965,11 +976,11 @@ def get_class_students(class_id: int):
     try:
         sql = text(
             """
-            SELECT u.user_id, u.name, u.email
+            SELECT u.user_id, u.name, u.email, ce.roll_number
             FROM class_enrollments ce
             JOIN users u ON ce.student_id = u.user_id
             WHERE ce.class_id = :class_id
-            ORDER BY u.name
+            ORDER BY ce.roll_number, u.name
             """
         )
         with engine.connect() as conn:
@@ -1034,8 +1045,8 @@ def join_class(join_data: JoinClassRequest):
         )
         enroll_sql = text(
             """
-            INSERT INTO class_enrollments (student_id, class_id)
-            VALUES (:student_id, :class_id)
+            INSERT INTO class_enrollments (student_id, class_id, roll_number)
+            VALUES (:student_id, :class_id, :roll_number)
             """
         )
         with engine.connect() as conn:
@@ -1061,10 +1072,10 @@ def join_class(join_data: JoinClassRequest):
                 return {"message": "Already enrolled", "class_id": class_id}
             
             # Enroll the student
-            print(f"[JOIN] Enrolling student {join_data.student_id} in class {class_id}")
+            print(f"[JOIN] Enrolling student {join_data.student_id} in class {class_id} with roll_number={join_data.roll_number}")
             conn.execute(
                 enroll_sql,
-                {"student_id": join_data.student_id, "class_id": class_id},
+                {"student_id": join_data.student_id, "class_id": class_id, "roll_number": join_data.roll_number},
             )
             conn.commit()
             
@@ -1417,11 +1428,11 @@ def get_session_attendance_flat(session_id: int):
             enroll = conn.execute(
                 text(
                     """
-                    SELECT u.user_id, u.name
+                    SELECT u.user_id, u.name, ce.roll_number
                     FROM class_enrollments ce
                     JOIN users u ON u.user_id = ce.student_id
                     WHERE ce.class_id = :cid
-                    ORDER BY u.name
+                    ORDER BY ce.roll_number NULLS LAST, u.name
                     """
                 ),
                 {"cid": cid},
@@ -1436,15 +1447,17 @@ def get_session_attendance_flat(session_id: int):
                     SELECT DISTINCT ON (ar.student_id)
                            ar.student_id,
                            u.name AS student_name,
+                           ce.roll_number,
                            ar.status,
                            ar.marked_at
                     FROM attendance_records ar
                     JOIN users u ON u.user_id = ar.student_id
+                    JOIN class_enrollments ce ON ce.student_id = ar.student_id AND ce.class_id = :cid
                     WHERE ar.session_id = :sid
                     ORDER BY ar.student_id, ar.marked_at DESC
                     """
                 ),
-                {"sid": session_id},
+                {"sid": session_id, "cid": cid},
             ).fetchall()
             present_rows = [dict(r._mapping) for r in marked]
             present_ids = {r["student_id"] for r in present_rows}
@@ -1457,6 +1470,7 @@ def get_session_attendance_flat(session_id: int):
                     {
                         "student_id": mid,
                         "student_name": (stu["name"] if stu else "Unknown"),
+                        "roll_number": (stu["roll_number"] if stu else None),
                         "status": "ABSENT",
                         "marked_at": None,
                     }
@@ -1495,6 +1509,146 @@ def get_class_sessions_stats(class_id: int):
                 row._mapping["last_start"].isoformat() if row and row._mapping["last_start"] else None
             )
             return {"sessions_count": sessions_count, "last_session": last_session}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- NEW: Get all sessions with attendance data for export ---
+@app.get("/api/faculty/classes/{class_id}/sessions/all-with-attendance")
+def get_all_sessions_with_attendance(class_id: int):
+    """
+    Efficiently fetch all sessions for a class with attendance data in one query.
+    Optimized for export functionality.
+    """
+    try:
+        with engine.connect() as conn:
+            # Verify class exists
+            class_row = conn.execute(
+                text("SELECT class_id FROM classes WHERE class_id = :cid"),
+                {"cid": class_id}
+            ).fetchone()
+            if not class_row:
+                raise HTTPException(status_code=404, detail="Class not found")
+
+            # Get all enrolled students for this class
+            enrolled_students = conn.execute(
+                text(
+                    """
+                    SELECT u.user_id, u.name, ce.roll_number
+                    FROM class_enrollments ce
+                    JOIN users u ON u.user_id = ce.student_id
+                    WHERE ce.class_id = :cid
+                    ORDER BY ce.roll_number NULLS LAST, u.name
+                    """
+                ),
+                {"cid": class_id},
+            ).fetchall()
+            enrolled = {row._mapping["user_id"]: {"name": row._mapping["name"], "roll_number": row._mapping["roll_number"]} for row in enrolled_students}
+            enrolled_ids = set(enrolled.keys())
+
+            # Get all sessions for this class
+            sessions_result = conn.execute(
+                text(
+                    """
+                    SELECT session_id, start_time, end_time, status
+                    FROM attendance_sessions
+                    WHERE class_id = :cid
+                    ORDER BY start_time DESC
+                    """
+                ),
+                {"cid": class_id},
+            ).fetchall()
+
+            if not sessions_result:
+                return {"sessions": []}
+
+            session_ids = [row._mapping["session_id"] for row in sessions_result]
+
+            # Get all attendance records for all sessions
+            # Build the SQL with proper parameter binding
+            if not session_ids:
+                attendance_records = []
+            else:
+                # Use IN clause with proper parameter binding
+                placeholders = ",".join([f":sid{i}" for i in range(len(session_ids))])
+                params = {f"sid{i}": sid for i, sid in enumerate(session_ids)}
+                
+                attendance_records = conn.execute(
+                    text(
+                        f"""
+                        SELECT ar.session_id, ar.student_id, u.name AS student_name,
+                               ce.roll_number, ar.status, ar.marked_at
+                        FROM attendance_records ar
+                        JOIN users u ON u.user_id = ar.student_id
+                        JOIN class_enrollments ce ON ce.student_id = ar.student_id AND ce.class_id = :cid
+                        WHERE ar.session_id IN ({placeholders})
+                        ORDER BY ar.session_id, ce.roll_number NULLS LAST, ar.student_id, ar.marked_at DESC
+                        """
+                    ),
+                    {**params, "cid": class_id},
+                ).fetchall()
+
+            # Group attendance by session and student (taking latest record per student)
+            session_attendance = {}
+            for record in attendance_records:
+                sid = record._mapping["session_id"]
+                student_id = record._mapping["student_id"]
+                
+                if sid not in session_attendance:
+                    session_attendance[sid] = {}
+                
+                # Only keep the first (latest) record per student due to ORDER BY
+                if student_id not in session_attendance[sid]:
+                    session_attendance[sid][student_id] = {
+                        "student_id": student_id,
+                        "student_name": record._mapping["student_name"],
+                        "roll_number": record._mapping["roll_number"],
+                        "status": record._mapping["status"],
+                        "marked_at": record._mapping["marked_at"].isoformat() if record._mapping["marked_at"] else None
+                    }
+
+            # Build response with complete data
+            sessions_data = []
+            for session_row in sessions_result:
+                sess = dict(session_row._mapping)
+                sid = sess["session_id"]
+                
+                # Get attendance for this session
+                session_records = session_attendance.get(sid, {})
+                present_ids = set(session_records.keys())
+                
+                # Add present/late students
+                records = list(session_records.values())
+                
+                # Add absent students (enrolled but not marked)
+                for student_id in sorted(enrolled_ids - present_ids):
+                    student_info = enrolled.get(student_id, {"name": "Unknown", "roll_number": None})
+                    records.append({
+                        "student_id": student_id,
+                        "student_name": student_info["name"],
+                        "roll_number": student_info["roll_number"],
+                        "status": "ABSENT",
+                        "marked_at": None
+                    })
+                
+                # Calculate totals
+                totals = {
+                    "present": sum(1 for r in records if r["status"] == "PRESENT"),
+                    "late": sum(1 for r in records if r["status"] == "LATE"),
+                    "absent": sum(1 for r in records if r["status"] == "ABSENT"),
+                }
+                
+                sessions_data.append({
+                    "session_id": sess["session_id"],
+                    "start_time": sess["start_time"].isoformat() if sess["start_time"] else None,
+                    "end_time": sess["end_time"].isoformat() if sess["end_time"] else None,
+                    "status": sess["status"],
+                    "records": records,
+                    "totals": totals
+                })
+
+            return {"sessions": sessions_data}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -122,6 +122,7 @@ const LocationCheck = ({ classId }) => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Roll Number</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="text-right">Status</TableHead>
@@ -130,6 +131,7 @@ const LocationCheck = ({ classId }) => {
           <TableBody>
             {students.map((student) => (
               <TableRow key={student.user_id}>
+                <TableCell>{student.roll_number || "—"}</TableCell>
                 <TableCell>{student.name}</TableCell>
                 <TableCell>{student.email}</TableCell>
                 <TableCell className="text-right">

@@ -45,17 +45,26 @@ export const NotificationProvider = ({ children }) => {
     loadNotifications();
   }, [user?.user_id]);
 
-  // Periodic refresh - polls for new notifications every 30 seconds
+  // Periodic refresh - only updates when there are new notifications
   useEffect(() => {
     if (!user?.user_id) return;
 
-    const interval = setInterval(() => {
-      loadNotifications();
-      loadUnreadCount();
-    }, 30000); // Poll every 30 seconds
+    const interval = setInterval(async () => {
+      try {
+        // Check unread count first without fetching all notifications
+        const newCount = await notificationApi.getUnreadCount();
+        if (newCount !== unreadCount) {
+          // Only fetch full list if count changed
+          loadNotifications();
+          setUnreadCount(newCount);
+        }
+      } catch (error) {
+        console.error("Failed to check for new notifications:", error);
+      }
+    }, 5000); // Check every 5 seconds instead of 1
 
     return () => clearInterval(interval);
-  }, [user?.user_id]);
+  }, [user?.user_id, unreadCount]);
 
   const markAsRead = async (notificationId) => {
     try {
