@@ -74,7 +74,11 @@ const ClassDetails = ({ classItem }) => {
       "Roll Number": r.roll_number || "—",
       "Student Name": r.student_name,
       Status: r.status === "LATE" ? "PRESENT" : r.status,
-      "Marked At": r.marked_at ? new Date(r.marked_at).toLocaleString() : "—",
+      "Marked At": r.marked_at ? new Date(r.marked_at).toLocaleString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }) : "—",
     }));
 
     // Add summary row
@@ -114,7 +118,11 @@ const ClassDetails = ({ classItem }) => {
     // Generate filename
     const sessionInfo = sessions.find((s) => s.session_id === selectedSession);
     const sessionTime = sessionInfo
-      ? new Date(sessionInfo.start_time).toLocaleTimeString().replace(/:/g, "-")
+      ? new Date(sessionInfo.start_time).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).replace(/:/g, "-")
       : "session";
     const filename = `${classItem.class_name}_${selectedDate}_${sessionTime}.xlsx`;
 
@@ -285,7 +293,11 @@ const ClassDetails = ({ classItem }) => {
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
-            ? new Date(r.marked_at).toLocaleString()
+            ? new Date(r.marked_at).toLocaleString("en-IN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
             : "—",
         }));
 
@@ -389,7 +401,11 @@ const ClassDetails = ({ classItem }) => {
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
-            ? new Date(r.marked_at).toLocaleString()
+            ? new Date(r.marked_at).toLocaleString("en-IN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
             : "—",
         }));
 
@@ -662,7 +678,11 @@ const ClassDetails = ({ classItem }) => {
                     {sessions.map((s) => (
                       <option key={s.session_id} value={s.session_id}>
                         Session {s.session_id} at{" "}
-                        {new Date(s.start_time).toLocaleTimeString()}
+                        {new Date(s.start_time).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
                       </option>
                     ))}
                   </select>
@@ -717,7 +737,11 @@ const ClassDetails = ({ classItem }) => {
 
                       <TableCell>
                         {r.marked_at
-                          ? new Date(r.marked_at).toLocaleTimeString()
+                          ? new Date(r.marked_at + 'Z').toLocaleTimeString("en-IN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            })
                           : "—"}
                       </TableCell>
                     </TableRow>
