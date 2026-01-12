@@ -74,11 +74,13 @@ const ClassDetails = ({ classItem }) => {
       "Roll Number": r.roll_number || "—",
       "Student Name": r.student_name,
       Status: r.status === "LATE" ? "PRESENT" : r.status,
-      "Marked At": r.marked_at ? new Date(r.marked_at).toLocaleString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }) : "—",
+      "Marked At": r.marked_at
+        ? new Date(r.marked_at).toLocaleString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+        : "—",
     }));
 
     // Add summary row
@@ -118,11 +120,13 @@ const ClassDetails = ({ classItem }) => {
     // Generate filename
     const sessionInfo = sessions.find((s) => s.session_id === selectedSession);
     const sessionTime = sessionInfo
-      ? new Date(sessionInfo.start_time).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        }).replace(/:/g, "-")
+      ? new Date(sessionInfo.start_time)
+          .toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })
+          .replace(/:/g, "-")
       : "session";
     const filename = `${classItem.class_name}_${selectedDate}_${sessionTime}.xlsx`;
 
@@ -737,11 +741,14 @@ const ClassDetails = ({ classItem }) => {
 
                       <TableCell>
                         {r.marked_at
-                          ? new Date(r.marked_at + 'Z').toLocaleTimeString("en-IN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              hour12: true,
-                            })
+                          ? new Date(r.marked_at + "Z").toLocaleTimeString(
+                              "en-IN",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              }
+                            )
                           : "—"}
                       </TableCell>
                     </TableRow>
