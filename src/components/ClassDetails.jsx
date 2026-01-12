@@ -369,6 +369,7 @@ const ClassDetails = ({ classItem }) => {
 
       const wb = XLSX.utils.book_new();
       const sessions = data.sessions;
+      const usedSheetNames = new Set();
 
       console.log(`Total sessions to export: ${sessions.length}`);
 
@@ -423,8 +424,18 @@ const ClassDetails = ({ classItem }) => {
         const timeStr = new Date(session.start_time)
           .toLocaleTimeString("en-US", { hour12: false })
           .replace(/:/g, "-");
-        // Use session index and time to ensure unique sheet names
-        const sheetName = `${dateStr}_${timeStr}`.substring(0, 31);
+        
+        // Create unique sheet name by appending counter if duplicate
+        let baseSheetName = `${dateStr}_${timeStr}`.substring(0, 28);
+        let sheetName = baseSheetName;
+        let counter = 1;
+        
+        while (usedSheetNames.has(sheetName)) {
+          sheetName = `${baseSheetName}_${counter}`;
+          counter++;
+        }
+        
+        usedSheetNames.add(sheetName);
         console.log(`Adding sheet: ${sheetName}`);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
       }
