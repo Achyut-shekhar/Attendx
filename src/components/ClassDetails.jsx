@@ -424,17 +424,17 @@ const ClassDetails = ({ classItem }) => {
         const timeStr = new Date(session.start_time)
           .toLocaleTimeString("en-US", { hour12: false })
           .replace(/:/g, "-");
-        
+
         // Create unique sheet name by appending counter if duplicate
         let baseSheetName = `${dateStr}_${timeStr}`.substring(0, 28);
         let sheetName = baseSheetName;
         let counter = 1;
-        
+
         while (usedSheetNames.has(sheetName)) {
           sheetName = `${baseSheetName}_${counter}`;
           counter++;
         }
-        
+
         usedSheetNames.add(sheetName);
         console.log(`Adding sheet: ${sheetName}`);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
