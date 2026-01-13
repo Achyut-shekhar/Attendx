@@ -75,7 +75,7 @@ const ClassDetails = ({ classItem }) => {
       "Student Name": r.student_name,
       Status: r.status === "LATE" ? "PRESENT" : r.status,
       "Marked At": r.marked_at
-        ? new Date(r.marked_at).toLocaleString("en-IN", {
+        ? new Date(r.marked_at + "Z").toLocaleString("en-IN", {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
@@ -172,7 +172,7 @@ const ClassDetails = ({ classItem }) => {
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
-            ? new Date(r.marked_at).toLocaleString()
+            ? new Date(r.marked_at + "Z").toLocaleString()
             : "—",
         }));
 
@@ -297,7 +297,7 @@ const ClassDetails = ({ classItem }) => {
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
-            ? new Date(r.marked_at).toLocaleString("en-IN", {
+            ? new Date(r.marked_at + "Z").toLocaleString("en-IN", {
                 hour: "2-digit",
                 minute: "2-digit",
                 second: "2-digit",
@@ -405,7 +405,7 @@ const ClassDetails = ({ classItem }) => {
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
-            ? new Date(r.marked_at).toLocaleString("en-IN", {
+            ? new Date(r.marked_at + "Z").toLocaleString("en-IN", {
                 hour: "2-digit",
                 minute: "2-digit",
                 second: "2-digit",
