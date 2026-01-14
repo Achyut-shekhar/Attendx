@@ -234,6 +234,9 @@ const ManualAttendance = ({
                     <p className="text-xs font-medium text-primary">
                       Roll: {s.roll_number || "—"}
                     </p>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Section: {s.section || "—"}
+                    </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Checkbox
@@ -263,6 +266,7 @@ const ManualAttendance = ({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-32">Roll</TableHead>
+                  <TableHead className="w-24">Section</TableHead>
                   <TableHead className="min-w-[160px]">Name</TableHead>
                   <TableHead className="min-w-[200px]">Email</TableHead>
                   <TableHead className="w-40 text-right">
@@ -284,6 +288,9 @@ const ManualAttendance = ({
                     <TableRow key={s.user_id}>
                       <TableCell className="text-sm font-medium">
                         {s.roll_number || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm uppercase text-muted-foreground">
+                        {s.section || "—"}
                       </TableCell>
                       <TableCell className="text-sm">{s.name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">

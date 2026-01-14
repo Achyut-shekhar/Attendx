@@ -175,6 +175,7 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [joinCode, setJoinCode] = useState("");
   const [rollNumber, setRollNumber] = useState("");
+  const [section, setSection] = useState("");
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
 
   const [selectedClass, setSelectedClass] = useState(null); // ✅ stores the class for which student enters code
@@ -209,6 +210,7 @@ const StudentDashboard = () => {
               attendanceRate: details.attendance_rate || 0,
               mode: "CODE",
               joinCode: cls.join_code,
+              section: cls.section || "",
             };
           } catch {
             return {
@@ -218,6 +220,7 @@ const StudentDashboard = () => {
               attendanceRate: 0,
               mode: "CODE",
               joinCode: cls.join_code,
+              section: cls.section || "",
             };
           }
         })
@@ -255,13 +258,14 @@ const StudentDashboard = () => {
     }
 
     try {
-      await studentAPI.joinClass(joinCode, rollNumber);
+      await studentAPI.joinClass(joinCode, rollNumber, section);
       toast({
         title: "Successfully Joined",
         description: "You are now enrolled.",
       });
       setJoinCode("");
       setRollNumber("");
+      setSection("");
       setIsJoinDialogOpen(false);
       fetchEnrolledClasses();
     } catch (error) {
@@ -460,6 +464,17 @@ const StudentDashboard = () => {
                     placeholder="Enter your roll number"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Section (Optional)</Label>
+                  <Input
+                    value={section}
+                    onChange={(e) => setSection(e.target.value.toUpperCase())}
+                    placeholder="e.g., A or B1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Helps faculty differentiate students when viewing rosters.
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2">
@@ -485,6 +500,9 @@ const StudentDashboard = () => {
                   <Badge>{c.attendanceRate.toFixed(2)}%</Badge>
                 </div>
                 <CardDescription>{c.facultyName}</CardDescription>
+                <div className="mt-2 text-xs font-medium text-muted-foreground">
+                  Section: {c.section ? c.section : "Not set"}
+                </div>
               </CardHeader>
 
               <CardContent className="space-y-4">
@@ -516,6 +534,9 @@ const StudentDashboard = () => {
                   <DialogTitle>
                     {selectedClass.name} - Attendance Details
                   </DialogTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Section: {selectedClass.section || "Not set"}
+                  </p>
                 </DialogHeader>
 
                 {recordsLoading ? (

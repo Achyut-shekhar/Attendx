@@ -72,6 +72,7 @@ const ClassDetails = ({ classItem }) => {
     // Prepare data for export
     const exportData = rows.map((r) => ({
       "Roll Number": r.roll_number || "—",
+      Section: r.section || "—",
       "Student Name": r.student_name,
       Status: r.status === "LATE" ? "PRESENT" : r.status,
       "Marked At": r.marked_at
@@ -87,24 +88,28 @@ const ClassDetails = ({ classItem }) => {
     exportData.push({});
     exportData.push({
       "Roll Number": "",
+      Section: "",
       "Student Name": "SUMMARY",
       Status: "",
       "Marked At": "",
     });
     exportData.push({
       "Roll Number": "",
+      Section: "",
       "Student Name": "Present",
       Status: totals.present,
       "Marked At": "",
     });
     exportData.push({
       "Roll Number": "",
+      Section: "",
       "Student Name": "Late",
       Status: totals.late,
       "Marked At": "",
     });
     exportData.push({
       "Roll Number": "",
+      Section: "",
       "Student Name": "Absent",
       Status: totals.absent,
       "Marked At": "",
@@ -169,6 +174,7 @@ const ClassDetails = ({ classItem }) => {
 
         const exportData = recs.map((r) => ({
           "Roll Number": r.roll_number || "—",
+          Section: r.section || "—",
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
@@ -185,18 +191,21 @@ const ClassDetails = ({ classItem }) => {
         exportData.push({});
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "SUMMARY",
           Status: "",
           "Marked At": "",
         });
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "Present",
           Status: present,
           "Marked At": "",
         });
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "Absent",
           Status: absent,
           "Marked At": "",
@@ -294,6 +303,7 @@ const ClassDetails = ({ classItem }) => {
 
         const exportData = recs.map((r) => ({
           "Roll Number": r.roll_number || "—",
+          Section: r.section || "—",
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
@@ -312,18 +322,21 @@ const ClassDetails = ({ classItem }) => {
         exportData.push({});
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "SUMMARY",
           Status: "",
           "Marked At": "",
         });
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "Present",
           Status: present,
           "Marked At": "",
         });
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "Absent",
           Status: totals.absent,
           "Marked At": "",
@@ -402,6 +415,7 @@ const ClassDetails = ({ classItem }) => {
 
         const exportData = recs.map((r) => ({
           "Roll Number": r.roll_number || "—",
+          Section: r.section || "—",
           "Student Name": r.student_name,
           Status: r.status === "LATE" ? "PRESENT" : r.status,
           "Marked At": r.marked_at
@@ -420,18 +434,21 @@ const ClassDetails = ({ classItem }) => {
         exportData.push({});
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "SUMMARY",
           Status: "",
           "Marked At": "",
         });
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "Present",
           Status: present,
           "Marked At": "",
         });
         exportData.push({
           "Roll Number": "",
+          Section: "",
           "Student Name": "Absent",
           Status: totals.absent,
           "Marked At": "",
@@ -537,6 +554,15 @@ const ClassDetails = ({ classItem }) => {
       setTotals({ present, late: 0, absent });
       setRows(
         recs.sort((a, b) => {
+          const sectionA = (a.section || "").toUpperCase();
+          const sectionB = (b.section || "").toUpperCase();
+          if (sectionA && sectionB && sectionA !== sectionB) {
+            return sectionA.localeCompare(sectionB, undefined, {
+              numeric: true,
+            });
+          }
+          if (sectionA && !sectionB) return -1;
+          if (!sectionA && sectionB) return 1;
           // Sort by roll number first, then by name if roll numbers are equal or missing
           const rollA = a.roll_number || "";
           const rollB = b.roll_number || "";
@@ -729,6 +755,9 @@ const ClassDetails = ({ classItem }) => {
                           Roll Number
                         </TableHead>
                         <TableHead className="whitespace-nowrap">
+                          Section
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap">
                           Student
                         </TableHead>
                         <TableHead className="whitespace-nowrap">
@@ -744,6 +773,7 @@ const ClassDetails = ({ classItem }) => {
                       {rows.map((r) => (
                         <TableRow key={r.student_id}>
                           <TableCell>{r.roll_number || "—"}</TableCell>
+                          <TableCell>{r.section || "—"}</TableCell>
                           <TableCell>{r.student_name}</TableCell>
 
                           <TableCell>

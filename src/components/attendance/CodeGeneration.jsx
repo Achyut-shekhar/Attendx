@@ -116,6 +116,7 @@ export default function CodeGeneration({
             <TableHeader>
               <TableRow>
                 <TableHead>Roll Number</TableHead>
+                <TableHead>Section</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead className="text-right">
@@ -129,6 +130,9 @@ export default function CodeGeneration({
                 return (
                   <TableRow key={s.user_id}>
                     <TableCell>{s.roll_number || "—"}</TableCell>
+                    <TableCell className="uppercase text-muted-foreground">
+                      {s.section || "—"}
+                    </TableCell>
                     <TableCell>{s.name}</TableCell>
                     <TableCell>{s.email}</TableCell>
                     <TableCell className="text-right">
@@ -142,7 +146,7 @@ export default function CodeGeneration({
               {students.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={5}
                     className="text-center text-muted-foreground"
                   >
                     No students enrolled in this class yet.

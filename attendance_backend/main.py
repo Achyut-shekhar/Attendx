@@ -339,6 +339,7 @@ class JoinClassRequest(BaseModel):
     join_code: str
     student_id: int
     roll_number: str  # Student's roll number for the class
+    section: Optional[str] = None  # Optional section label (A/B/etc)
 
 
 class MarkAttendanceRequest(BaseModel):
@@ -859,7 +860,7 @@ def get_class_attendance_by_date(class_id: int, date: str):
             # Enrolled students
             enroll_sql = text(
                 """
-                SELECT u.user_id, u.name, u.email
+                SELECT u.user_id, u.name, u.email, ce.roll_number, ce.section
                 FROM class_enrollments ce
                 JOIN users u ON u.user_id = ce.student_id
                 WHERE ce.class_id = :cid
@@ -878,10 +879,13 @@ def get_class_attendance_by_date(class_id: int, date: str):
                        ar.session_id,
                        ar.student_id,
                        u.name AS student_name,
+                       ce.roll_number,
+                       ce.section,
                        ar.status,
                        ar.marked_at
                 FROM attendance_records ar
                 JOIN users u ON u.user_id = ar.student_id
+                JOIN class_enrollments ce ON ce.student_id = ar.student_id AND ce.class_id = :cid
                 WHERE ar.session_id IN :sids
                 ORDER BY ar.session_id, ar.student_id, ar.marked_at DESC
                 """
@@ -889,7 +893,7 @@ def get_class_attendance_by_date(class_id: int, date: str):
 
             present_rows = [
                 dict(r._mapping)
-                for r in conn.execute(records_sql, {"sids": tuple(session_ids)})
+                for r in conn.execute(records_sql, {"sids": tuple(session_ids), "cid": class_id})
             ]
 
             # Build ABSENT rows
@@ -911,6 +915,8 @@ def get_class_attendance_by_date(class_id: int, date: str):
                             "session_id": sid,
                             "student_id": mid,
                             "student_name": stu["name"] if stu else "Unknown",
+                            "roll_number": stu.get("roll_number") if stu else None,
+                            "section": stu.get("section") if stu else None,
                             "status": "ABSENT",
                             "marked_at": None,
                         }
@@ -976,7 +982,7 @@ def get_class_students(class_id: int):
     try:
         sql = text(
             """
-            SELECT u.user_id, u.name, u.email, ce.roll_number
+            SELECT u.user_id, u.name, u.email, ce.roll_number, ce.section
             FROM class_enrollments ce
             JOIN users u ON ce.student_id = u.user_id
             WHERE ce.class_id = :class_id
@@ -1017,7 +1023,12 @@ def get_enrolled_classes(student_id: int):
     try:
         sql = text(
             """
-            SELECT c.class_id, c.class_name, c.join_code, u.name as faculty_name
+                 SELECT c.class_id,
+                     c.class_name,
+                     c.join_code,
+                     u.name as faculty_name,
+                     ce.roll_number,
+                     ce.section
             FROM class_enrollments ce
             JOIN classes c ON ce.class_id = c.class_id
             JOIN users u ON c.faculty_id = u.user_id
@@ -1038,6 +1049,9 @@ def get_enrolled_classes(student_id: int):
 def join_class(join_data: JoinClassRequest):
     try:
         print(f"[JOIN] Received: student_id={join_data.student_id}, join_code={join_data.join_code}")
+        section_value = (join_data.section or "").strip() or None
+        if section_value:
+            section_value = section_value[:50]
         
         find_sql = text("SELECT class_id FROM classes WHERE join_code = :join_code")
         check_enroll = text(
@@ -1045,8 +1059,8 @@ def join_class(join_data: JoinClassRequest):
         )
         enroll_sql = text(
             """
-            INSERT INTO class_enrollments (student_id, class_id, roll_number)
-            VALUES (:student_id, :class_id, :roll_number)
+            INSERT INTO class_enrollments (student_id, class_id, roll_number, section)
+            VALUES (:student_id, :class_id, :roll_number, :section)
             """
         )
         with engine.connect() as conn:
@@ -1072,10 +1086,15 @@ def join_class(join_data: JoinClassRequest):
                 return {"message": "Already enrolled", "class_id": class_id}
             
             # Enroll the student
-            print(f"[JOIN] Enrolling student {join_data.student_id} in class {class_id} with roll_number={join_data.roll_number}")
+            print(f"[JOIN] Enrolling student {join_data.student_id} in class {class_id} with roll_number={join_data.roll_number}, section={section_value}")
             conn.execute(
                 enroll_sql,
-                {"student_id": join_data.student_id, "class_id": class_id, "roll_number": join_data.roll_number},
+                {
+                    "student_id": join_data.student_id,
+                    "class_id": class_id,
+                    "roll_number": join_data.roll_number,
+                    "section": section_value,
+                },
             )
             conn.commit()
             
@@ -1428,7 +1447,7 @@ def get_session_attendance_flat(session_id: int):
             enroll = conn.execute(
                 text(
                     """
-                    SELECT u.user_id, u.name, ce.roll_number
+                    SELECT u.user_id, u.name, ce.roll_number, ce.section
                     FROM class_enrollments ce
                     JOIN users u ON u.user_id = ce.student_id
                     WHERE ce.class_id = :cid
@@ -1444,12 +1463,13 @@ def get_session_attendance_flat(session_id: int):
             marked = conn.execute(
                 text(
                     """
-                    SELECT DISTINCT ON (ar.student_id)
-                           ar.student_id,
-                           u.name AS student_name,
-                           ce.roll_number,
-                           ar.status,
-                           ar.marked_at
+                          SELECT DISTINCT ON (ar.student_id)
+                              ar.student_id,
+                              u.name AS student_name,
+                              ce.roll_number,
+                              ce.section,
+                              ar.status,
+                              ar.marked_at
                     FROM attendance_records ar
                     JOIN users u ON u.user_id = ar.student_id
                     JOIN class_enrollments ce ON ce.student_id = ar.student_id AND ce.class_id = :cid
@@ -1471,6 +1491,7 @@ def get_session_attendance_flat(session_id: int):
                         "student_id": mid,
                         "student_name": (stu["name"] if stu else "Unknown"),
                         "roll_number": (stu["roll_number"] if stu else None),
+                        "section": (stu["section"] if stu else None),
                         "status": "ABSENT",
                         "marked_at": None,
                     }
@@ -1534,7 +1555,7 @@ def get_all_sessions_with_attendance(class_id: int):
             enrolled_students = conn.execute(
                 text(
                     """
-                    SELECT u.user_id, u.name, ce.roll_number
+                    SELECT u.user_id, u.name, ce.roll_number, ce.section
                     FROM class_enrollments ce
                     JOIN users u ON u.user_id = ce.student_id
                     WHERE ce.class_id = :cid
@@ -1543,7 +1564,14 @@ def get_all_sessions_with_attendance(class_id: int):
                 ),
                 {"cid": class_id},
             ).fetchall()
-            enrolled = {row._mapping["user_id"]: {"name": row._mapping["name"], "roll_number": row._mapping["roll_number"]} for row in enrolled_students}
+            enrolled = {
+                row._mapping["user_id"]: {
+                    "name": row._mapping["name"],
+                    "roll_number": row._mapping["roll_number"],
+                    "section": row._mapping["section"],
+                }
+                for row in enrolled_students
+            }
             enrolled_ids = set(enrolled.keys())
 
             # Get all sessions for this class
@@ -1576,8 +1604,8 @@ def get_all_sessions_with_attendance(class_id: int):
                 attendance_records = conn.execute(
                     text(
                         f"""
-                        SELECT ar.session_id, ar.student_id, u.name AS student_name,
-                               ce.roll_number, ar.status, ar.marked_at
+                           SELECT ar.session_id, ar.student_id, u.name AS student_name,
+                               ce.roll_number, ce.section, ar.status, ar.marked_at
                         FROM attendance_records ar
                         JOIN users u ON u.user_id = ar.student_id
                         JOIN class_enrollments ce ON ce.student_id = ar.student_id AND ce.class_id = :cid
@@ -1603,6 +1631,7 @@ def get_all_sessions_with_attendance(class_id: int):
                         "student_id": student_id,
                         "student_name": record._mapping["student_name"],
                         "roll_number": record._mapping["roll_number"],
+                        "section": record._mapping["section"],
                         "status": record._mapping["status"],
                         "marked_at": record._mapping["marked_at"].isoformat() if record._mapping["marked_at"] else None
                     }
@@ -1622,11 +1651,12 @@ def get_all_sessions_with_attendance(class_id: int):
                 
                 # Add absent students (enrolled but not marked)
                 for student_id in sorted(enrolled_ids - present_ids):
-                    student_info = enrolled.get(student_id, {"name": "Unknown", "roll_number": None})
+                    student_info = enrolled.get(student_id, {"name": "Unknown", "roll_number": None, "section": None})
                     records.append({
                         "student_id": student_id,
                         "student_name": student_info["name"],
                         "roll_number": student_info["roll_number"],
+                        "section": student_info.get("section"),
                         "status": "ABSENT",
                         "marked_at": None
                     })

@@ -154,15 +154,21 @@ export const studentAPI = {
     return data;
   },
 
-  async joinClass(join_code, roll_number) {
+  async joinClass(join_code, roll_number, section) {
     const user = getUser();
     if (!user?.user_id) throw new Error("Not logged in as student");
 
-    const { data } = await api.post(`/student/classes/join`, {
+    const payload = {
       join_code,
       student_id: user.user_id,
       roll_number,
-    });
+    };
+
+    if (section && section.trim()) {
+      payload.section = section.trim();
+    }
+
+    const { data } = await api.post(`/student/classes/join`, payload);
     return data;
   },
 

@@ -27,9 +27,9 @@ try:
             AND column_name = 'roll_number'
         """))
         
-        column_exists = result.fetchone() is not None
+        roll_column_exists = result.fetchone() is not None
         
-        if column_exists:
+        if roll_column_exists:
             print("✅ roll_number column already exists in class_enrollments table")
         else:
             print("❌ roll_number column NOT found. Adding it now...")
@@ -48,6 +48,34 @@ try:
             
             conn.commit()
             print("✅ Successfully added roll_number column and index")
+
+        # Check if section column exists
+        result = conn.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'class_enrollments' 
+            AND column_name = 'section'
+        """))
+
+        section_column_exists = result.fetchone() is not None
+
+        if section_column_exists:
+            print("✅ section column already exists in class_enrollments table")
+        else:
+            print("❌ section column NOT found. Adding it now...")
+
+            conn.execute(text("""
+                ALTER TABLE class_enrollments 
+                ADD COLUMN section VARCHAR(50)
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_class_enrollments_section 
+                ON class_enrollments(class_id, section)
+            """))
+
+            conn.commit()
+            print("✅ Successfully added section column and index")
         
         # Show current schema
         print("\nCurrent class_enrollments table columns:")
