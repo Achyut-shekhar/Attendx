@@ -747,62 +747,70 @@ const FacultyDashboard = () => {
 
       {/* Location Capture Dialog */}
       <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Start Attendance Session</DialogTitle>
-            <DialogDescription>
-              Choose how to track attendance for{" "}
-              <strong>{classToStart?.class_name}</strong>
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-h-[90vh] max-w-lg gap-0 p-0 sm:w-[480px]">
+          <div className="flex h-full max-h-[90vh] flex-col overflow-hidden">
+            <DialogHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
+              <DialogTitle>Start Attendance Session</DialogTitle>
+              <DialogDescription>
+                Choose how to track attendance for{" "}
+                <strong>{classToStart?.class_name}</strong>
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            <div className="space-y-4">
-              <h3 className="font-medium">Location-Based Attendance</h3>
-              <p className="text-sm text-muted-foreground">
-                Enable location verification to ensure students are physically
-                present in the classroom.
-              </p>
+            <div className="flex-1 overflow-y-auto px-4 pb-6 pt-2 sm:px-6">
+              <div className="space-y-4 pb-4">
+                <h3 className="font-medium">Location-Based Attendance</h3>
+                <p className="text-sm text-muted-foreground">
+                  Enable location verification to ensure students are physically
+                  present in the classroom.
+                </p>
 
-              <LocationCapture onLocationCaptured={handleLocationCaptured} />
-
-              {sessionLocation && (
-                <div className="space-y-2">
-                  <Label htmlFor="radius">Allowed Radius (meters)</Label>
-                  <Input
-                    id="radius"
-                    type="number"
-                    min="10"
-                    max="500"
-                    value={radiusMeters}
-                    onChange={(e) =>
-                      setRadiusMeters(parseInt(e.target.value) || 50)
-                    }
+                <div className="max-h-[360px] overflow-y-auto pr-1 sm:max-h-none">
+                  <LocationCapture
+                    onLocationCaptured={handleLocationCaptured}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Students must be within {radiusMeters}m of your location to
-                    mark attendance.
-                  </p>
                 </div>
-              )}
-            </div>
-          </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => proceedWithSessionStart(false)}
-              disabled={startingSession}
-            >
-              Start Without Location
-            </Button>
-            <Button
-              variant="default"
-              onClick={() => proceedWithSessionStart(true)}
-              disabled={!sessionLocation || startingSession}
-            >
-              {startingSession ? "Starting..." : "Start with Location"}
-            </Button>
+                {sessionLocation && (
+                  <div className="space-y-2 rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <Label htmlFor="radius">Allowed Radius (meters)</Label>
+                    <Input
+                      id="radius"
+                      type="number"
+                      min="10"
+                      max="500"
+                      value={radiusMeters}
+                      onChange={(e) =>
+                        setRadiusMeters(parseInt(e.target.value, 10) || 50)
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Students must be within {radiusMeters}m of your location
+                      to mark attendance.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 flex flex-col gap-2 border-t border-border bg-background px-4 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => proceedWithSessionStart(false)}
+                disabled={startingSession}
+              >
+                Start Without Location
+              </Button>
+              <Button
+                variant="default"
+                className="w-full sm:w-auto"
+                onClick={() => proceedWithSessionStart(true)}
+                disabled={!sessionLocation || startingSession}
+              >
+                {startingSession ? "Starting..." : "Start with Location"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
