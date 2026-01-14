@@ -61,32 +61,17 @@ export default function CodeGeneration({
     return false;
   };
 
-  const showPopup = () => {
-    if (!code) {
-      toast({
-        title: "No code",
-        description: "Start a session from the Faculty Dashboard first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    alert(`Share this code with students:\n\n${code}`);
-  };
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Code Generation Attendance</CardTitle>
         <CardDescription>
-          Shows the SAME code created when you started the session. Button is
-          disabled after ending the session.
+          Share the auto-generated attendance code with students or copy it for
+          messaging apps.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-3 items-center">
-          <Button onClick={showPopup} disabled={!code || isClosed}>
-            Show Code Popup
-          </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
             variant="outline"
             onClick={() => {
@@ -99,13 +84,16 @@ export default function CodeGeneration({
               }
             }}
             disabled={!code || isClosed}
+            className="w-full sm:w-auto"
           >
             Copy Code
           </Button>
-          <div className="text-2xl font-bold tracking-widest">
-            {code || "—"}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+            <div className="w-full rounded-xl border border-dashed border-primary/40 bg-muted px-4 py-3 text-center font-mono text-lg sm:text-2xl font-semibold tracking-[0.3em] sm:tracking-widest text-primary break-words">
+              {code || "—"}
+            </div>
+            {isClosed && <Badge variant="destructive">Session Closed</Badge>}
           </div>
-          {isClosed && <Badge variant="destructive">Session Closed</Badge>}
         </div>
 
         <div className="border-t pt-4">

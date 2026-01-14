@@ -681,12 +681,12 @@ const StudentDashboard = () => {
 
         {/* ✅ Enter Attendance Code Dialog */}
         <Dialog open={codeDialogOpen} onOpenChange={setCodeDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
+          <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] flex flex-col overflow-hidden p-0">
+            <DialogHeader className="px-6 pt-6">
               <DialogTitle>Enter Attendance Code</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 px-6 overflow-y-auto flex-1">
               <div className="space-y-2">
                 <Label>Attendance Code</Label>
                 <Input
@@ -708,11 +708,11 @@ const StudentDashboard = () => {
                 />
 
                 {studentLocation && (
-                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg w-full overflow-hidden">
+                    <div className="flex items-center gap-2 text-green-800 font-medium mb-2 text-sm">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
+                        className="h-5 w-5 flex-shrink-0"
                         viewBox="0 0 20 20"
                         fill="currentColor"
                       >
@@ -724,11 +724,11 @@ const StudentDashboard = () => {
                       </svg>
                       <span>Location Ready</span>
                     </div>
-                    <p className="text-sm text-green-700">
+                    <p className="text-sm text-green-700 break-words">
                       Your location has been captured. When you submit, it will
                       be verified against the classroom radius.
                     </p>
-                    <div className="mt-2 text-xs text-green-600 font-mono">
+                    <div className="mt-2 text-xs text-green-600 font-mono break-all">
                       📍 {studentLocation.latitude.toFixed(6)},{" "}
                       {studentLocation.longitude.toFixed(6)}
                     </div>
@@ -737,17 +737,22 @@ const StudentDashboard = () => {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-2">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 px-4 sm:px-6 pb-4 sm:pb-6 pt-4 border-t border-border bg-background">
               <Button
                 variant="outline"
                 onClick={() => {
                   setCodeDialogOpen(false);
                   setStudentLocation(null);
                 }}
+                className="min-h-[44px] w-full sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button onClick={handleCodeSubmit} disabled={!enteredCode.trim()}>
+              <Button
+                onClick={handleCodeSubmit}
+                disabled={!enteredCode.trim()}
+                className="min-h-[44px] w-full sm:w-auto"
+              >
                 {studentLocation ? "Submit with Location ✓" : "Submit Code"}
               </Button>
             </div>
