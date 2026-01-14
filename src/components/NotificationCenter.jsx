@@ -96,7 +96,7 @@ const NotificationCenter = () => {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
@@ -157,18 +157,18 @@ const NotificationCenter = () => {
                           {notification.title}
                         </CardTitle>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="h-2 w-2 bg-primary rounded-full" />
+                      <div className="flex items-center gap-2">
+                        <div className="h-2.5 w-2.5 bg-primary rounded-full flex-shrink-0" />
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 rounded-full hover:bg-destructive/10 flex-shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteNotification(notification.notification_id);
                           }}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-3 w-3 text-destructive" />
                         </Button>
                       </div>
                     </div>

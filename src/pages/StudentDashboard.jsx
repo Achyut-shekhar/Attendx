@@ -418,12 +418,14 @@ const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Student Dashboard</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">
+              Student Dashboard
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               {enrolledClasses.length} enrolled class
               {enrolledClasses.length !== 1 ? "es" : ""}
             </p>
@@ -432,7 +434,7 @@ const StudentDashboard = () => {
           {/* Join Class */}
           <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="hero">
+              <Button variant="hero" className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-1" /> Join Class
               </Button>
             </DialogTrigger>
@@ -474,7 +476,7 @@ const StudentDashboard = () => {
         </div>
 
         {/* Classes */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {enrolledClasses.map((c) => (
             <Card key={c.id}>
               <CardHeader>
@@ -521,7 +523,7 @@ const StudentDashboard = () => {
                 ) : (
                   <div className="space-y-6">
                     {/* Statistics Summary */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <Card>
                         <CardHeader className="pb-2">
                           <CardDescription>Total Sessions</CardDescription>

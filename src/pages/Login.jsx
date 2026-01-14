@@ -86,15 +86,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md">
         <Card className="shadow-large">
-          <CardHeader className="text-center pb-6">
-            <div className="flex justify-center mb-4">
-              <GraduationCap className="h-12 w-12 text-primary" />
+          <CardHeader className="text-center pb-4 sm:pb-6">
+            <div className="flex justify-center mb-3 sm:mb-4">
+              <GraduationCap className="h-10 w-10 sm:h-12 sm:w-12 text-primary" />
             </div>
-            <CardTitle className="text-3xl font-bold">AttendX</CardTitle>
-            <CardDescription className="text-lg">
+            <CardTitle className="text-2xl sm:text-3xl font-bold">
+              AttendX
+            </CardTitle>
+            <CardDescription className="text-base sm:text-lg">
               Attendance Management System
             </CardDescription>
           </CardHeader>

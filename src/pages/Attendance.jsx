@@ -57,32 +57,32 @@ const Attendance = () => {
   }, [classId, sessionId]);
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-3 sm:p-4">
       {/* ✅ Header with Navigation */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate("/faculty-dashboard")}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Dashboard
             </Button>
-            <h1 className="text-2xl font-bold">Take Attendance</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Take Attendance</h1>
           </div>
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Class ID: {classId} • Session ID: {sessionId || "—"}
         </p>
       </div>
 
       {/* ✅ Session Status Card */}
       {session && (
-        <Card className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800 shadow-md">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="mb-4 sm:mb-6 p-4 sm:p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800 shadow-md">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
             <div className="flex items-center space-x-3">
               <div className="flex-shrink-0 w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                 <svg

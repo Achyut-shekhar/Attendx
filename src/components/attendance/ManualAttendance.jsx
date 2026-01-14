@@ -200,65 +200,123 @@ const ManualAttendance = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Manual Attendance</CardTitle>
-        <p className="text-sm text-muted-foreground mt-2">
+    <Card className="shadow-sm">
+      <CardHeader className="space-y-2 p-4 sm:p-6">
+        <CardTitle className="text-lg sm:text-xl">Manual Attendance</CardTitle>
+        <p className="text-sm text-muted-foreground">
           ✨ Check/uncheck students to mark them present or absent. You can
           override attendance marked via code.
         </p>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Roll Number</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="text-right">Mark Present</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {students.map((s) => {
-              const isMarked = attendance.some(
-                (a) =>
-                  Number(a.session_id) === Number(sessionId) &&
-                  a.attendance_status === "PRESENT" &&
-                  (a.student_id === s.user_id || a.student_name === s.name)
-              );
-              const isChecked = attended.includes(s.user_id);
-              const codeMarked = isMarked && !isChecked;
+      <CardContent className="space-y-4 p-4 sm:p-0">
+        {/* Mobile stacked list */}
+        <div className="space-y-3 sm:hidden">
+          {students.map((s) => {
+            const isMarked = attendance.some(
+              (a) =>
+                Number(a.session_id) === Number(sessionId) &&
+                a.attendance_status === "PRESENT" &&
+                (a.student_id === s.user_id || a.student_name === s.name)
+            );
+            const isChecked = attended.includes(s.user_id);
 
-              return (
-                <TableRow key={s.user_id}>
-                  <TableCell>{s.roll_number || "—"}</TableCell>
-                  <TableCell>{s.name}</TableCell>
-                  <TableCell>{s.email}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Checkbox
-                        checked={isChecked}
-                        onCheckedChange={(checked) =>
-                          toggleImmediate(s, checked)
-                        }
-                        disabled={loading || !!rowLoading[s.user_id]}
-                      />
-                      {isMarked && (
-                        <Badge
-                          variant="outline"
-                          className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
-                        >
-                          Via Code
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
+            return (
+              <div
+                key={`${s.user_id}-mobile`}
+                className="rounded-xl border bg-card/70 p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      {s.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{s.email}</p>
+                    <p className="text-xs font-medium text-primary">
+                      Roll: {s.roll_number || "—"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={(checked) => toggleImmediate(s, checked)}
+                      disabled={loading || !!rowLoading[s.user_id]}
+                    />
+                    {isMarked && (
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]"
+                      >
+                        Via Code
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop/tablet table */}
+        <div className="hidden overflow-hidden rounded-t-none rounded-b-lg border-t border-border sm:block">
+          <div className="overflow-x-auto">
+            <Table className="min-w-[600px] text-sm">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-32">Roll</TableHead>
+                  <TableHead className="min-w-[160px]">Name</TableHead>
+                  <TableHead className="min-w-[200px]">Email</TableHead>
+                  <TableHead className="w-40 text-right">
+                    Mark Present
+                  </TableHead>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        <div className="mt-4 text-sm text-muted-foreground text-center">
+              </TableHeader>
+              <TableBody>
+                {students.map((s) => {
+                  const isMarked = attendance.some(
+                    (a) =>
+                      Number(a.session_id) === Number(sessionId) &&
+                      a.attendance_status === "PRESENT" &&
+                      (a.student_id === s.user_id || a.student_name === s.name)
+                  );
+                  const isChecked = attended.includes(s.user_id);
+
+                  return (
+                    <TableRow key={s.user_id}>
+                      <TableCell className="text-sm font-medium">
+                        {s.roll_number || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm">{s.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {s.email}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={(checked) =>
+                              toggleImmediate(s, checked)
+                            }
+                            disabled={loading || !!rowLoading[s.user_id]}
+                          />
+                          {isMarked && (
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                            >
+                              Via Code
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        <div className="text-center text-sm text-muted-foreground">
           ✓ Attendance is automatically saved when you check/uncheck students
         </div>
       </CardContent>

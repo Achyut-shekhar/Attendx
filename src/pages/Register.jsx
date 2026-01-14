@@ -106,12 +106,12 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md">
         <Card className="shadow-large">
           <CardHeader>
-            <CardTitle>Register</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl sm:text-3xl">Register</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
               Create an account to start using the attendance system
             </CardDescription>
           </CardHeader>

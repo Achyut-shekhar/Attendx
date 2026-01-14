@@ -595,14 +595,14 @@ const ClassDetails = ({ classItem }) => {
   }
 
   return (
-    <div>
-      <h2 className="text-xl font-bold mb-4">
+    <div className="px-2 sm:px-3 pb-4">
+      <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4">
         {classItem.class_name} Attendance
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         {/* Calendar */}
-        <div className="md:col-span-1 flex justify-center">
+        <div className="lg:col-span-1 flex justify-center">
           <Calendar
             mode="single"
             month={month}
@@ -613,16 +613,18 @@ const ClassDetails = ({ classItem }) => {
               setDate(d);
               setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
             }}
-            className="rounded-md border"
+            className="rounded-md border w-full max-w-sm"
           />
         </div>
 
         {/* Right Panel */}
-        <div className="md:col-span-2">
+        <div className="lg:col-span-2">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <CardTitle>Attendance for {selectedDate}</CardTitle>
-              <div className="flex flex-col items-end gap-2">
+            <CardHeader className="flex flex-col items-start justify-between gap-3 pb-4">
+              <CardTitle className="text-base sm:text-lg">
+                Attendance for {selectedDate}
+              </CardTitle>
+              <div className="flex flex-col w-full sm:w-auto gap-2">
                 {exportProgress && (
                   <span className="text-xs text-muted-foreground">
                     {exportProgress}
@@ -633,11 +635,14 @@ const ClassDetails = ({ classItem }) => {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex items-center gap-2"
+                      className="flex items-center justify-center gap-2 w-full sm:w-auto"
                       disabled={exportLoading}
                     >
                       <Download className="h-4 w-4" />
-                      {exportLoading ? "Exporting..." : "Export to Excel"}
+                      <span className="hidden sm:inline">
+                        {exportLoading ? "Exporting..." : "Export to Excel"}
+                      </span>
+                      <span className="sm:hidden">Export</span>
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -694,67 +699,83 @@ const ClassDetails = ({ classItem }) => {
               )}
 
               {/* Totals */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-600">Present</p>
-                  <p className="text-3xl font-bold text-green-700">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4">
+                <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                  <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">
+                    Present
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-300">
                     {totals.present}
                   </p>
                 </div>
 
-                <div className="p-4 bg-red-50 rounded-lg">
-                  <p className="text-sm text-red-600">Absent</p>
-                  <p className="text-3xl font-bold text-red-700">
+                <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">
+                    Absent
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-bold text-red-700 dark:text-red-300">
                     {totals.absent}
                   </p>
                 </div>
               </div>
 
-              {/* Table */}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Roll Number</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Time</TableHead>
-                  </TableRow>
-                </TableHeader>
+              {/* Table - Mobile Responsive with Horizontal Scroll */}
+              <div className="overflow-x-auto -mx-3 sm:mx-0">
+                <div className="inline-block min-w-full align-middle">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="whitespace-nowrap">
+                          Roll Number
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap">
+                          Student
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap">
+                          Status
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap">
+                          Time
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
 
-                <TableBody>
-                  {rows.map((r) => (
-                    <TableRow key={r.student_id}>
-                      <TableCell>{r.roll_number || "—"}</TableCell>
-                      <TableCell>{r.student_name}</TableCell>
+                    <TableBody>
+                      {rows.map((r) => (
+                        <TableRow key={r.student_id}>
+                          <TableCell>{r.roll_number || "—"}</TableCell>
+                          <TableCell>{r.student_name}</TableCell>
 
-                      <TableCell>
-                        <Badge
-                          variant={
-                            r.status === "PRESENT" || r.status === "LATE"
-                              ? "default"
-                              : "destructive"
-                          }
-                        >
-                          {r.status === "LATE" ? "PRESENT" : r.status}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell>
-                        {r.marked_at
-                          ? new Date(r.marked_at + "Z").toLocaleTimeString(
-                              "en-IN",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true,
+                          <TableCell>
+                            <Badge
+                              variant={
+                                r.status === "PRESENT" || r.status === "LATE"
+                                  ? "default"
+                                  : "destructive"
                               }
-                            )
-                          : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            >
+                              {r.status === "LATE" ? "PRESENT" : r.status}
+                            </Badge>
+                          </TableCell>
+
+                          <TableCell>
+                            {r.marked_at
+                              ? new Date(r.marked_at + "Z").toLocaleTimeString(
+                                  "en-IN",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    hour12: true,
+                                  }
+                                )
+                              : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -762,15 +783,17 @@ const ClassDetails = ({ classItem }) => {
 
       {/* Date Range Export Dialog */}
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Export Date Range</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">
+              Export Date Range
+            </DialogTitle>
+            <DialogDescription className="text-sm">
               Select a date range to export all attendance sessions within that
               period.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Start Date</label>
               <div className="flex justify-center">
@@ -778,7 +801,7 @@ const ClassDetails = ({ classItem }) => {
                   mode="single"
                   selected={startDate}
                   onSelect={(d) => d && setStartDate(d)}
-                  className="rounded-md border"
+                  className="rounded-md border w-full max-w-sm"
                 />
               </div>
             </div>
@@ -789,25 +812,30 @@ const ClassDetails = ({ classItem }) => {
                   mode="single"
                   selected={endDate}
                   onSelect={(d) => d && setEndDate(d)}
-                  className="rounded-md border"
+                  className="rounded-md border w-full max-w-sm"
                 />
               </div>
             </div>
           </div>
           {exportProgress && (
-            <div className="text-sm text-center text-muted-foreground py-2">
+            <div className="text-xs sm:text-sm text-center text-muted-foreground py-2">
               {exportProgress}
             </div>
           )}
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => setShowDateRangeDialog(false)}
               disabled={exportLoading}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button onClick={exportDateRange} disabled={exportLoading}>
+            <Button
+              onClick={exportDateRange}
+              disabled={exportLoading}
+              className="w-full sm:w-auto"
+            >
               {exportLoading ? "Exporting..." : "Export"}
             </Button>
           </div>
