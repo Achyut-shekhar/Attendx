@@ -9,6 +9,10 @@ import {
   Search,
   Trash2,
   CheckCircle,
+  BookOpen,
+  Sparkles,
+  TrendingUp,
+  Clock,
 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/enhanced-button";
@@ -57,40 +61,48 @@ const ClassCard = ({
   startingSession,
 }) => {
   return (
-    <Card className="shadow-medium hover:shadow-large transition-all duration-300">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">{classItem.class_name}</CardTitle>
-            <CardDescription className="font-mono">
-              Code: {classItem.join_code}
+    <Card className="group relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm hover:shadow-xl hover:border-primary/30 transition-all duration-300 hover:-translate-y-1">
+      {/* Decorative gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+      <CardHeader className="relative pb-3">
+        <div className="flex justify-between items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base sm:text-lg font-semibold truncate">
+              {classItem.class_name}
+            </CardTitle>
+            <CardDescription className="font-mono text-xs sm:text-sm mt-1">
+              Code:{" "}
+              <span className="text-primary font-semibold">
+                {classItem.join_code}
+              </span>
             </CardDescription>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {status && (
               <Badge
                 variant={
                   status === "active"
                     ? "default"
                     : status === "ended"
-                    ? "destructive"
-                    : "secondary"
+                    ? "secondary"
+                    : "outline"
                 }
                 className={
                   status === "active"
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : ""
+                    ? "bg-green-600 hover:bg-green-700 text-white text-xs"
+                    : "text-xs"
                 }
               >
                 {status === "ended" ? (
                   <span className="flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1 text-green-600 dark:text-green-400" />
+                    <CheckCircle className="h-3 w-3 mr-1 text-green-600 dark:text-green-400" />
                     Ended
                   </span>
                 ) : status === "active" ? (
                   <span className="flex items-center capitalize">
-                    <span className="h-2 w-2 mr-1.5 bg-white rounded-full animate-pulse"></span>
-                    Active
+                    <span className="h-1.5 w-1.5 mr-1.5 bg-white rounded-full animate-pulse"></span>
+                    Live
                   </span>
                 ) : (
                   status
@@ -102,47 +114,67 @@ const ClassCard = ({
               size="icon"
               onClick={() => onDelete(classItem)}
               title="Delete Class"
+              className="h-8 w-8 opacity-50 hover:opacity-100 hover:bg-destructive/10"
             >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-sm">
-          <div className="flex items-center space-x-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span>{classItem.students_count || 0} students</span>
+      <CardContent className="relative space-y-4 pt-0">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 p-2.5 sm:p-3 rounded-xl bg-muted/50">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-blue-500/10">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-xl font-bold">
+                {classItem.students_count || 0}
+              </p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                Students
+              </p>
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{classItem.sessions_count || 0} sessions</span>
+          <div className="flex items-center gap-2 p-2.5 sm:p-3 rounded-xl bg-muted/50">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10">
+              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-500" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-xl font-bold">
+                {classItem.sessions_count || 0}
+              </p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                Sessions
+              </p>
+            </div>
           </div>
         </div>
 
         {classItem.last_session && (
-          <p className="text-xs text-muted-foreground">
-            Last session: {classItem.last_session}
-          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>Last: {classItem.last_session}</span>
+          </div>
         )}
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 pt-1">
           <Button
             variant={status === "active" ? "default" : "outline"}
             size="sm"
-            className="w-full"
+            className={`w-full h-9 sm:h-10 text-xs sm:text-sm ${
+              status === "active" ? "shadow-lg" : ""
+            }`}
             disabled={startingSession}
             onClick={() => {
               if (status === "active") {
-                // Navigate to active attendance session
                 onGoToAttendance(classItem);
               } else {
-                // Start a new session
                 onStartSession(classItem);
               }
             }}
           >
-            <Play className="h-4 w-4 mr-2" />
+            <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
             {startingSession
               ? "Starting..."
               : status === "active"
@@ -155,7 +187,7 @@ const ClassCard = ({
             <Button
               variant="outline"
               size="sm"
-              className="flex-1"
+              className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
               onClick={() => onViewDetails(classItem)}
             >
               View Details
@@ -164,7 +196,7 @@ const ClassCard = ({
               <Button
                 variant="destructive"
                 size="sm"
-                className="flex-1"
+                className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                 onClick={() => onEndSession(classItem)}
               >
                 End Session
@@ -173,8 +205,8 @@ const ClassCard = ({
           </div>
         </div>
         {status === "ended" && (
-          <div className="text-center text-green-600 font-semibold mt-2">
-            Class Ended
+          <div className="text-center text-green-600 font-semibold text-sm mt-2">
+            ✓ Session Complete
           </div>
         )}
       </CardContent>
@@ -202,6 +234,7 @@ const FacultyDashboard = () => {
   const [endedClassIds, setEndedClassIds] = useState([]);
   const [activeSessions, setActiveSessions] = useState({});
   const [startingSession, setStartingSession] = useState(false); // Prevent double-click
+  const [creatingClass, setCreatingClass] = useState(false); // Prevent double-click on create
   const [endSessionDialogOpen, setEndSessionDialogOpen] = useState(false);
   const [classToEnd, setClassToEnd] = useState(null);
 
@@ -287,6 +320,10 @@ const FacultyDashboard = () => {
   const mergedSessions = { ...activeSessions, ...sessions };
 
   const handleCreateClass = async () => {
+    if (creatingClass) {
+      console.log("[FacultyDashboard] Ignoring duplicate create class click");
+      return;
+    }
     if (!newClass.name.trim()) {
       toast({
         title: "Validation Error",
@@ -296,6 +333,7 @@ const FacultyDashboard = () => {
       return;
     }
     try {
+      setCreatingClass(true);
       const createdClass = await facultyAPI.createClass(newClass.name);
       // Enrich the newly created class with stats (will likely be zeros initially)
       const enriched = await enrichClassWithStats(createdClass);
@@ -312,6 +350,8 @@ const FacultyDashboard = () => {
         description: error.message || "Failed to create class.",
         variant: "destructive",
       });
+    } finally {
+      setCreatingClass(false);
     }
   };
 
@@ -525,14 +565,25 @@ const FacultyDashboard = () => {
     <div className="min-h-screen bg-background" key={updateCounter}>
       <Header />
 
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8 gap-4">
+      {/* Background decorative elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 sm:mb-8 gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-              Faculty Dashboard
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-2 rounded-xl bg-primary/10">
+                <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              </div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+                Faculty Dashboard
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm lg:text-base text-muted-foreground ml-11 sm:ml-12">
               Manage your classes and attendance sessions
             </p>
           </div>
@@ -544,23 +595,27 @@ const FacultyDashboard = () => {
             <DialogTrigger asChild>
               <Button
                 variant="hero"
-                className="flex items-center space-x-2 w-full sm:w-auto"
+                className="flex items-center gap-2 w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base rounded-xl shadow-lg hover:shadow-xl transition-all"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span>Create Class</span>
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Create New Class</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-lg sm:text-xl">
+                  Create New Class
+                </DialogTitle>
+                <DialogDescription className="text-sm">
                   Add a new class to your dashboard
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="className">Class Name</Label>
+                  <Label htmlFor="className" className="text-sm font-medium">
+                    Class Name
+                  </Label>
                   <Input
                     id="className"
                     placeholder="e.g., Computer Science 101"
@@ -568,10 +623,13 @@ const FacultyDashboard = () => {
                     onChange={(e) =>
                       setNewClass({ ...newClass, name: e.target.value })
                     }
+                    className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="joinCode">Join Code (Optional)</Label>
+                  <Label htmlFor="joinCode" className="text-sm font-medium">
+                    Join Code (Optional)
+                  </Label>
                   <Input
                     id="joinCode"
                     placeholder="Leave empty to auto-generate"
@@ -579,50 +637,140 @@ const FacultyDashboard = () => {
                     onChange={(e) =>
                       setNewClass({ ...newClass, joinCode: e.target.value })
                     }
+                    className="h-11"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                 <Button
                   variant="outline"
                   onClick={() => setIsCreateDialogOpen(false)}
+                  className="h-10 sm:h-11"
                 >
                   Cancel
                 </Button>
-                <Button variant="default" onClick={handleCreateClass}>
-                  Create Class
+                <Button
+                  variant="default"
+                  onClick={handleCreateClass}
+                  disabled={creatingClass}
+                  className="h-10 sm:h-11"
+                >
+                  {creatingClass ? "Creating..." : "Create Class"}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
 
-        {/* Search */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6">
+        {/* Search & Filter */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6 sm:mb-8">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search classes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-10 sm:h-11 bg-card/50 border-border/50 focus:border-primary"
             />
           </div>
           <Button
             variant="outline"
-            className="flex items-center justify-center space-x-2 w-full sm:w-auto"
+            className="flex items-center justify-center gap-2 h-10 sm:h-11 w-full sm:w-auto"
           >
             <Filter className="h-4 w-4" />
             <span>Filter</span>
           </Button>
         </div>
 
+        {/* Stats Overview */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-blue-500/10">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold">
+                    {classes.length}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    Total Classes
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-green-500/10">
+                  <Play className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold">
+                    {activeClasses.length}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    Active Now
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-purple-500/10">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold">
+                    {classes.reduce(
+                      (sum, c) => sum + (c.students_count || 0),
+                      0
+                    )}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    Total Students
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-orange-500/10">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold">
+                    {classes.reduce(
+                      (sum, c) => sum + (c.sessions_count || 0),
+                      0
+                    )}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    Total Sessions
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Active Sessions */}
         {activeClasses.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Active Sessions</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+              <h2 className="text-lg sm:text-xl font-semibold">
+                Active Sessions
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {activeClasses.map((classItem) => (
                 <ClassCard
                   key={classItem.class_id}
@@ -642,9 +790,14 @@ const FacultyDashboard = () => {
 
         {/* Ended Sessions */}
         {endedClasses.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Ended Sessions</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+              <h2 className="text-lg sm:text-xl font-semibold">
+                Ended Sessions
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {endedClasses.map((classItem) => (
                 <ClassCard
                   key={classItem.class_id}
@@ -663,10 +816,13 @@ const FacultyDashboard = () => {
         )}
 
         {/* Your Classes */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Your Classes</h2>
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            <h2 className="text-lg sm:text-xl font-semibold">Your Classes</h2>
+          </div>
           {scheduledClasses.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {scheduledClasses.map((classItem) => (
                 <ClassCard
                   key={classItem.class_id}
@@ -682,7 +838,21 @@ const FacultyDashboard = () => {
               ))}
             </div>
           ) : (
-            <p>No scheduled classes.</p>
+            <Card className="border-border/50 bg-card/50 border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="p-4 rounded-full bg-muted/50 mb-4">
+                  <BookOpen className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-lg font-medium mb-2">No classes yet</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create your first class to get started
+                </p>
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Class
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </div>
 
@@ -772,21 +942,51 @@ const FacultyDashboard = () => {
                 </div>
 
                 {sessionLocation && (
-                  <div className="space-y-2 rounded-xl border border-border/60 bg-muted/30 p-3">
+                  <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-3">
                     <Label htmlFor="radius">Allowed Radius (meters)</Label>
-                    <Input
-                      id="radius"
-                      type="number"
-                      min="10"
-                      max="500"
-                      value={radiusMeters}
-                      onChange={(e) =>
-                        setRadiusMeters(parseInt(e.target.value, 10) || 50)
-                      }
-                    />
+                    <div className="flex flex-wrap gap-2">
+                      {[20, 30, 50, 75, 100, 150, 200].map((r) => (
+                        <Button
+                          key={r}
+                          type="button"
+                          size="sm"
+                          variant={radiusMeters === r ? "default" : "outline"}
+                          onClick={() => setRadiusMeters(r)}
+                          className="min-w-[50px]"
+                        >
+                          {r}m
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        Custom:
+                      </span>
+                      <Input
+                        id="radius"
+                        type="number"
+                        min="5"
+                        max="1000"
+                        value={radiusMeters}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val >= 5 && val <= 1000) {
+                            setRadiusMeters(val);
+                          }
+                        }}
+                        className="w-24"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        meters
+                      </span>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Students must be within {radiusMeters}m of your location
-                      to mark attendance.
+                      Students must be within {radiusMeters}m of your location.
+                      GPS accuracy (±
+                      {sessionLocation.accuracy
+                        ? Math.round(sessionLocation.accuracy)
+                        : "?"}
+                      m) is automatically accounted for.
                     </p>
                   </div>
                 )}

@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Users, Code, Loader } from "lucide-react";
+import {
+  Plus,
+  Users,
+  Code,
+  Loader,
+  GraduationCap,
+  TrendingUp,
+  BookOpen,
+  Calendar,
+  Sparkles,
+} from "lucide-react";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/enhanced-button";
 import {
@@ -62,7 +72,7 @@ const AttendanceCalendar = ({
   let week = [];
 
   for (let i = 0; i < offset; i++)
-    week.push(<div key={`empty-start-${i}`} className="h-12" />);
+    week.push(<div key={`empty-start-${i}`} className="h-10 sm:h-12" />);
 
   for (let day = 1; day <= daysInMonth; day++) {
     const status = records[day];
@@ -71,18 +81,18 @@ const AttendanceCalendar = ({
     week.push(
       <div
         key={day}
-        className={`h-12 flex flex-col items-center justify-center rounded-lg text-sm font-medium
+        className={`h-10 sm:h-12 flex flex-col items-center justify-center rounded-lg text-xs sm:text-sm font-medium transition-all
         ${
           status === "present"
-            ? "bg-green-500 text-white"
+            ? "bg-green-500 text-white shadow-sm"
             : status === "absent"
-            ? "bg-red-500 text-white"
-            : "bg-muted text-muted-foreground"
+            ? "bg-red-500 text-white shadow-sm"
+            : "bg-muted/50 text-muted-foreground"
         }`}
       >
-        <span className={counts ? "text-xs" : ""}>{day}</span>
+        <span className={counts ? "text-[10px] sm:text-xs" : ""}>{day}</span>
         {counts && (
-          <span className="text-[10px] opacity-90 font-normal">
+          <span className="text-[8px] sm:text-[10px] opacity-90 font-normal">
             {counts.present}/{counts.total}
           </span>
         )}
@@ -92,10 +102,10 @@ const AttendanceCalendar = ({
     if (week.length === 7 || day === daysInMonth) {
       if (day === daysInMonth && week.length < 7) {
         for (let j = week.length; j < 7; j++)
-          week.push(<div key={`empty-end-${j}`} className="h-12" />);
+          week.push(<div key={`empty-end-${j}`} className="h-10 sm:h-12" />);
       }
       weeks.push(
-        <div key={`week-${day}`} className="grid grid-cols-7 gap-2">
+        <div key={`week-${day}`} className="grid grid-cols-7 gap-1 sm:gap-2">
           {week}
         </div>
       );
@@ -104,8 +114,8 @@ const AttendanceCalendar = ({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between mb-2">
+    <div className="space-y-3 p-3 sm:p-4 rounded-xl bg-muted/30 border border-border/50">
+      <div className="flex items-center justify-between">
         <button
           onClick={() => {
             if (month === 1) {
@@ -115,11 +125,11 @@ const AttendanceCalendar = ({
               setMonth(month - 1);
             }
           }}
-          className="p-1 rounded hover:bg-muted"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-muted transition-colors"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
         </button>
-        <span className="font-semibold text-lg">
+        <span className="font-semibold text-sm sm:text-lg">
           {monthNames[month - 1]} {year}
         </span>
         <button
@@ -131,13 +141,13 @@ const AttendanceCalendar = ({
               setMonth(month + 1);
             }
           }}
-          className="p-1 rounded hover:bg-muted"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-muted transition-colors"
         >
-          <ChevronRight className="h-5 w-5" />
+          <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 text-center font-semibold text-muted-foreground">
+      <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs font-semibold text-muted-foreground">
         <div>Mon</div>
         <div>Tue</div>
         <div>Wed</div>
@@ -147,21 +157,21 @@ const AttendanceCalendar = ({
         <div>Sun</div>
       </div>
 
-      {weeks}
+      <div className="space-y-1 sm:space-y-2">{weeks}</div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-green-500"></div>
-          <span className="text-sm">Present</span>
+      <div className="flex items-center justify-center gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-border/50">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-green-500"></div>
+          <span className="text-xs sm:text-sm">Present</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-red-500"></div>
-          <span className="text-sm">Absent</span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-red-500"></div>
+          <span className="text-xs sm:text-sm">Absent</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-muted"></div>
-          <span className="text-sm">No Class</span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-muted"></div>
+          <span className="text-xs sm:text-sm">No Class</span>
         </div>
       </div>
     </div>
@@ -414,62 +424,102 @@ const StudentDashboard = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Header />
-        <Loader className="h-8 w-8 animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Loading your classes...
+          </p>
+        </div>
       </div>
     );
   }
 
+  // Calculate stats
+  const totalSessions = enrolledClasses.reduce(
+    (sum, c) => sum + (c.sessionsCount || 0),
+    0
+  );
+  const avgAttendance =
+    enrolledClasses.length > 0
+      ? (
+          enrolledClasses.reduce((sum, c) => sum + c.attendanceRate, 0) /
+          enrolledClasses.length
+        ).toFixed(1)
+      : 0;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        {/* Header */}
+
+      {/* Background decorative elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
+        {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              Student Dashboard
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-2 rounded-xl bg-primary/10">
+                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              </div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">
+                Student Dashboard
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm lg:text-base text-muted-foreground ml-11 sm:ml-12">
               {enrolledClasses.length} enrolled class
               {enrolledClasses.length !== 1 ? "es" : ""}
             </p>
           </div>
 
-          {/* Join Class */}
+          {/* Join Class Button */}
           <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="hero" className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-1" /> Join Class
+              <Button
+                variant="hero"
+                className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base rounded-xl shadow-lg hover:shadow-xl transition-all"
+              >
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Join Class
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Join a Class</DialogTitle>
+                <DialogTitle className="text-lg sm:text-xl">
+                  Join a Class
+                </DialogTitle>
               </DialogHeader>
 
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>Join Code</Label>
+                  <Label className="text-sm font-medium">Join Code</Label>
                   <Input
                     value={joinCode}
                     onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                     placeholder="Enter class join code"
+                    className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Roll Number</Label>
+                  <Label className="text-sm font-medium">Roll Number</Label>
                   <Input
                     value={rollNumber}
                     onChange={(e) => setRollNumber(e.target.value)}
                     placeholder="Enter your roll number"
+                    className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Section (Optional)</Label>
+                  <Label className="text-sm font-medium">
+                    Section (Optional)
+                  </Label>
                   <Input
                     value={section}
                     onChange={(e) => setSection(e.target.value.toUpperCase())}
                     placeholder="e.g., A or B1"
+                    className="h-11"
                   />
                   <p className="text-xs text-muted-foreground">
                     Helps faculty differentiate students when viewing rosters.
@@ -477,87 +527,194 @@ const StudentDashboard = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                 <Button
                   variant="outline"
                   onClick={() => setIsJoinDialogOpen(false)}
+                  className="h-10 sm:h-11"
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleJoinClass}>Join</Button>
+                <Button onClick={handleJoinClass} className="h-10 sm:h-11">
+                  Join
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
 
-        {/* Classes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {enrolledClasses.map((c) => (
-            <Card key={c.id}>
-              <CardHeader>
-                <div className="flex justify-between">
-                  <CardTitle>{c.name}</CardTitle>
-                  <Badge>{c.attendanceRate.toFixed(2)}%</Badge>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-blue-500/10">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                 </div>
-                <CardDescription>{c.facultyName}</CardDescription>
-                <div className="mt-2 text-xs font-medium text-muted-foreground">
-                  Section: {c.section ? c.section : "Not set"}
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold">
+                    {enrolledClasses.length}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    Classes
+                  </p>
                 </div>
-              </CardHeader>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-green-500/10">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold">
+                    {avgAttendance}%
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    Avg Attendance
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-              <CardContent className="space-y-4">
-                {/* ✅ ALWAYS SHOW CODE BUTTON */}
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    setSelectedClass(c); // ✅ STORE SELECTED CLASS
-                    setCodeDialogOpen(true);
-                  }}
+        {/* Classes Section */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            <h2 className="text-lg sm:text-xl font-semibold">Your Classes</h2>
+          </div>
+
+          {enrolledClasses.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {enrolledClasses.map((c) => (
+                <Card
+                  key={c.id}
+                  className="group relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm hover:shadow-xl hover:border-primary/30 transition-all duration-300 hover:-translate-y-1"
                 >
-                  <Code className="h-4 w-4 mr-2" /> Enter Code
-                </Button>
+                  {/* Decorative gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                <Button variant="outline" onClick={() => handleViewDetails(c)}>
-                  View Details
+                  <CardHeader className="relative pb-3">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base sm:text-lg font-semibold truncate">
+                          {c.name}
+                        </CardTitle>
+                        <CardDescription className="text-xs sm:text-sm mt-1">
+                          {c.facultyName}
+                        </CardDescription>
+                      </div>
+                      <Badge
+                        variant={
+                          c.attendanceRate >= 75
+                            ? "default"
+                            : c.attendanceRate >= 50
+                            ? "secondary"
+                            : "destructive"
+                        }
+                        className={`text-xs font-semibold ${
+                          c.attendanceRate >= 75 ? "bg-green-600" : ""
+                        }`}
+                      >
+                        {c.attendanceRate.toFixed(1)}%
+                      </Badge>
+                    </div>
+                    {c.section && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="text-xs">
+                          Section: {c.section}
+                        </Badge>
+                      </div>
+                    )}
+                  </CardHeader>
+
+                  <CardContent className="relative space-y-3 pt-0">
+                    <Button
+                      className="w-full h-10 sm:h-11 text-sm shadow-lg hover:shadow-xl transition-all"
+                      onClick={() => {
+                        setSelectedClass(c);
+                        setCodeDialogOpen(true);
+                      }}
+                    >
+                      <Code className="h-4 w-4 mr-2" /> Enter Code
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => handleViewDetails(c)}
+                      className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                    >
+                      View Details
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="border-border/50 bg-card/50 border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="p-4 rounded-full bg-muted/50 mb-4">
+                  <GraduationCap className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-lg font-medium mb-2">No classes yet</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Join your first class to get started
+                </p>
+                <Button onClick={() => setIsJoinDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Join Class
                 </Button>
               </CardContent>
             </Card>
-          ))}
+          )}
         </div>
 
         {/* Attendance Details */}
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-4xl max-h-[90vh] overflow-y-auto">
             {selectedClass && (
               <>
                 <DialogHeader>
-                  <DialogTitle>
+                  <DialogTitle className="text-lg sm:text-xl">
                     {selectedClass.name} - Attendance Details
                   </DialogTitle>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Section: {selectedClass.section || "Not set"}
                   </p>
                 </DialogHeader>
 
                 {recordsLoading ? (
-                  <Loader className="h-6 w-6 animate-spin mx-auto" />
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <Loader className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Loading records...
+                    </p>
+                  </div>
                 ) : (
                   <div className="space-y-6">
                     {/* Statistics Summary */}
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardDescription>Total Sessions</CardDescription>
-                          <CardTitle className="text-2xl">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <Card className="border-border/50 bg-muted/30">
+                        <CardHeader className="p-3 sm:p-4 pb-2">
+                          <CardDescription className="text-xs">
+                            Total Sessions
+                          </CardDescription>
+                          <CardTitle className="text-xl sm:text-2xl">
                             {attendanceRecords.records?.length || 0}
                           </CardTitle>
                         </CardHeader>
                       </Card>
 
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardDescription>Present</CardDescription>
-                          <CardTitle className="text-2xl text-green-600">
+                      <Card className="border-border/50 bg-green-500/5">
+                        <CardHeader className="p-3 sm:p-4 pb-2">
+                          <CardDescription className="text-xs">
+                            Present
+                          </CardDescription>
+                          <CardTitle className="text-xl sm:text-2xl text-green-600">
                             {attendanceRecords.records?.filter(
                               (r) =>
                                 r.status === "PRESENT" || r.status === "LATE"
@@ -566,10 +723,12 @@ const StudentDashboard = () => {
                         </CardHeader>
                       </Card>
 
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardDescription>Absent</CardDescription>
-                          <CardTitle className="text-2xl text-red-600">
+                      <Card className="border-border/50 bg-red-500/5">
+                        <CardHeader className="p-3 sm:p-4 pb-2">
+                          <CardDescription className="text-xs">
+                            Absent
+                          </CardDescription>
+                          <CardTitle className="text-xl sm:text-2xl text-red-600">
                             {attendanceRecords.records?.filter(
                               (r) => r.status === "ABSENT"
                             ).length || 0}
@@ -577,10 +736,12 @@ const StudentDashboard = () => {
                         </CardHeader>
                       </Card>
 
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardDescription>Attendance Rate</CardDescription>
-                          <CardTitle className="text-2xl">
+                      <Card className="border-border/50 bg-primary/5">
+                        <CardHeader className="p-3 sm:p-4 pb-2">
+                          <CardDescription className="text-xs">
+                            Attendance Rate
+                          </CardDescription>
+                          <CardTitle className="text-xl sm:text-2xl text-primary">
                             {attendanceRecords.records?.length > 0
                               ? Math.round(
                                   (attendanceRecords.records.filter(

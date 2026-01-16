@@ -3,15 +3,41 @@ import { api } from "../services/api";
 
 export const notificationApi = {
   async getAll(userId, unreadOnly = false) {
-    const response = await api.get(
-      `/notifications/${userId}?unread_only=${unreadOnly}`
-    );
-    return response.data;
+    try {
+      console.log(
+        `[NotificationAPI] Fetching notifications for user ${userId}, unreadOnly=${unreadOnly}`
+      );
+      const response = await api.get(
+        `/notifications/${userId}?unread_only=${unreadOnly}`
+      );
+      console.log(
+        `[NotificationAPI] Got ${response.data?.length || 0} notifications`
+      );
+      return response.data;
+    } catch (error) {
+      console.error(
+        "[NotificationAPI] getAll error:",
+        error.response?.data || error.message
+      );
+      throw error;
+    }
   },
 
   async getUnreadCount(userId) {
-    const response = await api.get(`/notifications/${userId}/unread-count`);
-    return response.data;
+    try {
+      const response = await api.get(`/notifications/${userId}/unread-count`);
+      console.log(
+        `[NotificationAPI] Unread count for user ${userId}:`,
+        response.data
+      );
+      return response.data;
+    } catch (error) {
+      console.error(
+        "[NotificationAPI] getUnreadCount error:",
+        error.response?.data || error.message
+      );
+      throw error;
+    }
   },
 
   async markAsRead(notificationId) {

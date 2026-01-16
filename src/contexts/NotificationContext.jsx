@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { notificationApi } from "@/api/notifications";
 import { useAuth } from "./AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -10,24 +17,58 @@ export const useNotifications = () => useContext(NotificationContext);
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const prevCountRef = useRef(0);
 
   // Load unread notifications
-  const loadNotifications = async () => {
-    if (!user?.user_id) return;
-    try {
-      setIsLoading(true);
-      const data = await notificationApi.getAll(user.user_id, true); // unread only
-      setNotifications(data);
-      setUnreadCount(data.length);
-    } catch (error) {
-      console.error("Failed to load notifications:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const loadNotifications = useCallback(
+    async (showToastForNew = false) => {
+      if (!user?.user_id) {
+        console.log("[Notifications] No user, skipping load");
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        console.log("[Notifications] Loading for user:", user.user_id);
+        const data = await notificationApi.getAll(user.user_id, true); // unread only
+        console.log(
+          "[Notifications] Loaded:",
+          data?.length || 0,
+          "notifications"
+        );
+
+        // Show toast for genuinely new notifications
+        if (
+          showToastForNew &&
+          data.length > prevCountRef.current &&
+          prevCountRef.current > 0
+        ) {
+          const newCount = data.length - prevCountRef.current;
+          const latestNotification = data[0]; // Most recent notification
+          toast({
+            title: latestNotification?.title || "New Notification",
+            description:
+              latestNotification?.message ||
+              `You have ${newCount} new notification${newCount > 1 ? "s" : ""}`,
+            duration: 5000,
+          });
+        }
+
+        prevCountRef.current = data.length;
+        setNotifications(data || []);
+        setUnreadCount(data?.length || 0);
+      } catch (error) {
+        console.error("[Notifications] Failed to load:", error);
+        // Don't clear notifications on error, keep existing ones
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [user?.user_id, toast]
+  );
 
   // Load unread count
   const loadUnreadCount = async () => {
@@ -42,29 +83,55 @@ export const NotificationProvider = ({ children }) => {
 
   // Load notifications when user changes
   useEffect(() => {
-    loadNotifications();
-  }, [user?.user_id]);
+    if (user?.user_id) {
+      console.log(
+        "[Notifications] User changed, loading notifications for:",
+        user.user_id
+      );
+      prevCountRef.current = 0; // Reset on user change
+      loadNotifications();
+    } else {
+      console.log("[Notifications] No user, clearing notifications");
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, [user?.user_id, loadNotifications]);
 
   // Periodic refresh - only updates when there are new notifications
   useEffect(() => {
     if (!user?.user_id) return;
 
+    console.log(
+      "[Notifications] Starting polling interval for user:",
+      user.user_id
+    );
+
     const interval = setInterval(async () => {
       try {
         // Check unread count first without fetching all notifications
-        const newCount = await notificationApi.getUnreadCount();
+        const data = await notificationApi.getUnreadCount(user.user_id);
+        const newCount = data?.count || 0;
+        console.log(
+          "[Notifications] Poll result - server count:",
+          newCount,
+          "local count:",
+          unreadCount
+        );
+
         if (newCount !== unreadCount) {
-          // Only fetch full list if count changed
-          loadNotifications();
-          setUnreadCount(newCount);
+          // Fetch full list and show toast if count increased
+          loadNotifications(newCount > unreadCount);
         }
       } catch (error) {
-        console.error("Failed to check for new notifications:", error);
+        console.error("[Notifications] Polling error:", error);
       }
-    }, 5000); // Check every 5 seconds instead of 1
+    }, 5000); // Check every 5 seconds
 
-    return () => clearInterval(interval);
-  }, [user?.user_id, unreadCount]);
+    return () => {
+      console.log("[Notifications] Clearing polling interval");
+      clearInterval(interval);
+    };
+  }, [user?.user_id, unreadCount, loadNotifications]);
 
   const markAsRead = async (notificationId) => {
     try {

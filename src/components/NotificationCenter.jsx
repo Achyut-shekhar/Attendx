@@ -50,6 +50,7 @@ const NotificationCenter = () => {
       case "class_joined":
         return <Users className="h-4 w-4 text-primary" />;
       case "attendance_marked":
+      case "student_marked":
         return <Check className="h-4 w-4 text-success" />;
       case "attendance_absent":
         return <AlertCircle className="h-4 w-4 text-destructive" />;

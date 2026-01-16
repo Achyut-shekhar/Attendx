@@ -353,6 +353,7 @@ class SubmitAttendanceCode(BaseModel):
     code: str
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    accuracy: Optional[float] = None  # GPS accuracy in meters
 
 
 class StartSessionRequest(BaseModel):
@@ -537,15 +538,37 @@ def get_faculty_classes(faculty_id: int):
 @app.post("/api/faculty/classes")
 def create_faculty_class(class_data: CreateClassRequest):
     try:
-        join_code = class_data.join_code or generate_code()
-        sql = text(
-            """
-            INSERT INTO classes (class_name, faculty_id, join_code)
-            VALUES (:class_name, :faculty_id, :join_code)
-            RETURNING class_id, class_name, join_code
-            """
-        )
         with engine.connect() as conn:
+            # Check if a class with the same name already exists for this faculty
+            check_sql = text(
+                """
+                SELECT class_id FROM classes 
+                WHERE class_name = :class_name AND faculty_id = :faculty_id
+                LIMIT 1
+                """
+            )
+            existing = conn.execute(
+                check_sql,
+                {
+                    "class_name": class_data.class_name,
+                    "faculty_id": class_data.faculty_id,
+                }
+            ).fetchone()
+            
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"A class with the name '{class_data.class_name}' already exists"
+                )
+            
+            join_code = class_data.join_code or generate_code()
+            sql = text(
+                """
+                INSERT INTO classes (class_name, faculty_id, join_code)
+                VALUES (:class_name, :faculty_id, :join_code)
+                RETURNING class_id, class_name, join_code
+                """
+            )
             res = conn.execute(
                 sql,
                 {
@@ -556,6 +579,8 @@ def create_faculty_class(class_data: CreateClassRequest):
             )
             conn.commit()
             return dict(res.fetchone()._mapping)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1187,13 +1212,21 @@ def submit_code(payload: SubmitAttendanceCode):
                         payload.latitude, payload.longitude
                     )
                     
+                    # Account for GPS accuracy - add student's accuracy as buffer
+                    # GPS accuracy represents uncertainty in reported position
+                    student_accuracy = payload.accuracy or 0
+                    # Limit accuracy buffer to reasonable value (max 100m extra buffer)
+                    accuracy_buffer = min(student_accuracy, 100)
+                    effective_radius = radius_meters + accuracy_buffer
+                    
                     print(f"[LOCATION_CHECK] Session: ({session_lat}, {session_lon})")
                     print(f"[LOCATION_CHECK] Student: ({payload.latitude}, {payload.longitude})")
-                    print(f"[LOCATION_CHECK] Distance: {distance:.2f}m, Radius: {radius_meters}m")
+                    print(f"[LOCATION_CHECK] Student GPS accuracy: ±{student_accuracy:.0f}m")
+                    print(f"[LOCATION_CHECK] Distance: {distance:.2f}m, Base Radius: {radius_meters}m, Effective Radius (with accuracy buffer): {effective_radius:.0f}m")
                     
-                    if distance > radius_meters:
+                    if distance > effective_radius:
                         status = "ABSENT"
-                        location_message = f" - Outside zone (Distance: {distance:.0f}m, Allowed: {radius_meters}m)"
+                        location_message = f" - Outside zone (Distance: {distance:.0f}m, Allowed: {effective_radius:.0f}m)"
                         print(f"[LOCATION_CHECK] Student is OUTSIDE the allowed radius")
                     else:
                         location_message = f" - Within zone ({distance:.0f}m)"
@@ -1227,18 +1260,29 @@ def submit_code(payload: SubmitAttendanceCode):
 
             conn.commit()
             
-            # Get class name and create notification
-            class_sql = text("SELECT class_name FROM classes WHERE class_id = :cid")
-            class_info = conn.execute(class_sql, {"cid": class_id}).fetchone()
+            # Get class info, student name, and faculty_id for notifications
+            class_sql = text("""
+                SELECT c.class_name, c.faculty_id, u.name as student_name
+                FROM classes c
+                JOIN users u ON u.user_id = :student_id
+                WHERE c.class_id = :cid
+            """)
+            class_info = conn.execute(class_sql, {"cid": class_id, "student_id": payload.student_id}).fetchone()
             if class_info:
-                class_name = class_info[0]
+                class_name = class_info.class_name
+                faculty_id = class_info.faculty_id
+                student_name = class_info.student_name or "A student"
+                
+                # Notify student about their attendance
                 if status == "ABSENT":
                     create_notification(
                         user_id=payload.student_id,
                         type="attendance_marked",
                         title="Attendance: Outside Zone",
                         message=f"You were outside the classroom radius for {class_name}{location_message}",
-                        priority="high"
+                        priority="high",
+                        related_class_id=class_id,
+                        related_session_id=session_id
                     )
                 else:
                     create_notification(
@@ -1246,8 +1290,21 @@ def submit_code(payload: SubmitAttendanceCode):
                         type="attendance_marked",
                         title="Attendance Confirmed",
                         message=f"Your attendance has been recorded as {status} for {class_name}{location_message}",
-                        priority="low"
+                        priority="low",
+                        related_class_id=class_id,
+                        related_session_id=session_id
                     )
+                
+                # Notify faculty that a student marked attendance
+                create_notification(
+                    user_id=faculty_id,
+                    type="student_marked",
+                    title="Student Attendance",
+                    message=f"{student_name} marked attendance for {class_name} ({status})",
+                    priority="low",
+                    related_class_id=class_id,
+                    related_session_id=session_id
+                )
             
             return {
                 "message": f"Attendance marked as {status}{location_message}",
@@ -1696,24 +1753,28 @@ def create_notification(
     related_class_id: Optional[int] = None,
     related_session_id: Optional[int] = None
 ):
-    """Helper function to create notifications - works with existing table schema"""
+    """Helper function to create notifications - stores all fields properly"""
     try:
         with engine.connect() as conn:
-            # Use only columns that exist in the actual notifications table
+            # Store all notification fields for rich UI display
             sql = text(
                 """
                 INSERT INTO notifications 
-                (user_id, type, message, is_read, created_at)
-                VALUES (:uid, :type, :message, FALSE, CURRENT_TIMESTAMP)
+                (user_id, type, title, message, priority, related_class_id, related_session_id, is_read, created_at)
+                VALUES (:uid, :type, :title, :message, :priority, :class_id, :session_id, FALSE, CURRENT_TIMESTAMP)
                 """
             )
             conn.execute(sql, {
                 "uid": user_id,
                 "type": type,
-                "message": message  # Combine title and message for the message field
+                "title": title,
+                "message": message,
+                "priority": priority,
+                "class_id": related_class_id,
+                "session_id": related_session_id
             })
             conn.commit()
-            print(f"[NOTIFICATION] Created notification for user_id={user_id}, type={type}")
+            print(f"[NOTIFICATION] Created: user={user_id}, type={type}, title={title}")
     except Exception as e:
         print(f"[NOTIFICATION] Failed to create notification: {str(e)}")
 

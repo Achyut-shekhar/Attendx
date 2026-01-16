@@ -7,10 +7,14 @@ export const attendanceApi = {
   async submitAttendanceCode(studentId, code, location = null) {
     const payload = { student_id: studentId, code };
 
-    // Add location if provided
+    // Add location if provided (including accuracy for better verification)
     if (location) {
       payload.latitude = location.latitude;
       payload.longitude = location.longitude;
+      // Send accuracy so backend can account for GPS uncertainty
+      if (location.accuracy) {
+        payload.accuracy = location.accuracy;
+      }
     }
 
     const res = await fetch(`${API_URL}/attendance/submit-code`, {
