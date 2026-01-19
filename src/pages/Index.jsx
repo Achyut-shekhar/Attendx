@@ -220,7 +220,7 @@ const Index = () => {
                   <div className="aspect-video w-full">
                     <iframe
                       className="w-full h-full"
-                      src="https://youtu.be/NmcK22WJIDk?si=vul6Lp75ydyJiiTn"
+                      src="https://www.youtube.com/embed/NmcK22WJIDk?si=vul6Lp75ydyJiiTn"
                       title="AttendX Demo Video"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
