@@ -13,6 +13,7 @@ import {
   MapPin,
   ArrowRight,
   Sparkles,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/enhanced-button";
 import {
@@ -22,6 +23,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -38,7 +45,7 @@ const useScrollAnimation = () => {
           observer.unobserve(entry.target);
         }
       },
-      { threshold: 0.05, rootMargin: "0px 0px -100px 0px" }
+      { threshold: 0.05, rootMargin: "0px 0px -100px 0px" },
     );
 
     if (ref.current) {
@@ -85,12 +92,12 @@ const AnimatedSection = ({
         transform: isVisible
           ? "translateY(0) translateX(0) scale(1)"
           : direction === "left"
-          ? "translateX(-50px)"
-          : direction === "right"
-          ? "translateX(50px)"
-          : direction === "scale"
-          ? "scale(0.9)"
-          : "translateY(60px)",
+            ? "translateX(-50px)"
+            : direction === "right"
+              ? "translateX(50px)"
+              : direction === "scale"
+                ? "scale(0.9)"
+                : "translateY(60px)",
       }}
     >
       {children}
@@ -101,6 +108,7 @@ const AnimatedSection = ({
 const Index = () => {
   const { user } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const [showDemoVideo, setShowDemoVideo] = useState(false);
 
   // Redirect authenticated users to their dashboard
   if (user) {
@@ -197,9 +205,30 @@ const Index = () => {
                 variant="outline"
                 size="lg"
                 className="text-lg px-8 py-6 rounded-xl"
+                onClick={() => setShowDemoVideo(true)}
               >
+                <Play className="h-5 w-5 mr-2" />
                 Watch Demo
               </Button>
+
+              {/* Demo Video Dialog */}
+              <Dialog open={showDemoVideo} onOpenChange={setShowDemoVideo}>
+                <DialogContent className="sm:max-w-4xl p-0 overflow-hidden">
+                  <DialogHeader className="p-4 pb-0">
+                    <DialogTitle>AttendX Demo</DialogTitle>
+                  </DialogHeader>
+                  <div className="aspect-video w-full">
+                    <iframe
+                      className="w-full h-full"
+                      src="https://youtu.be/NmcK22WJIDk"
+                      title="AttendX Demo Video"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
