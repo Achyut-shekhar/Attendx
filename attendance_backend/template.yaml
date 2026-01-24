@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Attendance Backend
+  
+  Serverless FastAPI application
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+
+Resources:
+  AttendanceApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.main.handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: any
+            TimeoutInMillis: 29000
+            PayloadFormatVersion: "2.0"
+            CorsConfiguration:
+              AllowOrigins:
+                - "*"
+              AllowMethods:
+                - "*"
+              AllowHeaders:
+                - "*"
+      Environment:
+        Variables:
+          DB_URL: !Ref DatabaseUrl
+          SECRET_KEY: !Ref SecretKey
+          FRONTEND_URL: !Ref FrontendUrl
+
+  # Optional SQS Queue for Async Tasks (Notifications)
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: "attendance-notifications-queue"
+      VisibilityTimeout: 60
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    Description: PostgreSQL Database URL
+  SecretKey:
+    Type: String
+    Description: Secret Key for JWT
+  FrontendUrl:
+    Type: String
+    Description: Frontend URL for CORS
+    Default: "http://localhost:5173"
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"

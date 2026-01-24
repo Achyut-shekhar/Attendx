@@ -89,10 +89,10 @@ pip install -r requirements.txt
 
 # Start backend server in a new window
 Write-Status "Starting backend server..."
-$backendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$pwd'; .\venv\Scripts\Activate.ps1; python -m uvicorn main:app --reload" -PassThru
+$backendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$pwd'; ..\venv\Scripts\Activate.ps1; python -m uvicorn src.main:app --reload" -PassThru
 
 # Return to root directory and install frontend dependencies
-Set-Location ..
+Set-Location ..\frontend
 Write-Status "Installing frontend dependencies..."
 npm install
 

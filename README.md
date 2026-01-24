@@ -99,7 +99,7 @@ python database_manager.py
 4. Start the backend server:
 
 ```bash
-python -m uvicorn main:app --reload
+python -m uvicorn src.main:app --reload
 ```
 
 The backend will be running at http://127.0.0.1:8000
@@ -109,10 +109,12 @@ The backend will be running at http://127.0.0.1:8000
 1. Install frontend dependencies:
 
 ```bash
+# From root directory
+cd frontend
 npm install
 ```
 
-2. Create a `.env` file in the root directory with:
+2. Create a `.env` file in the frontend directory with:
 
 ```
 VITE_API_URL=http://127.0.0.1:8000
@@ -154,26 +156,24 @@ The frontend will be running at http://localhost:5173
 ```
 facul-student-hub/
 ├── attendance_backend/   # FastAPI backend
-│   ├── database.py      # Database connection
-│   ├── queries.py       # SQL queries
-│   ├── main.py         # API endpoints
-│   └── requirements.txt # Python dependencies
+│   ├── src/             # Application source (core, routers, models)
+│   ├── sql/            # Database scripts
+│   └── template.yaml   # AWS SAM template
 │
-├── src/                 # Frontend source code
-│   ├── components/      # React components
-│   │   ├── ui/         # Shadcn UI components
-│   │   ├── layout/     # Layout components
-│   │   └── attendance/ # Attendance components
-│   ├── contexts/       # React contexts
-│   ├── hooks/          # Custom hooks
-│   ├── api/           # API services
-│   ├── lib/           # Utilities
-│   ├── pages/         # Page components
-│   └── main.jsx       # Entry point
+├── frontend/            # React Code
+│   ├── src/            # Frontend source
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   ├── hooks/
+│   │   ├── api/
+│   │   └── pages/
+│   ├── public/
+│   ├── .env
+│   ├── package.json
+│   └── vite.config.js
 │
-├── public/             # Static assets
-├── .env               # Environment variables
-└── package.json
+├── docs/               # Documentation
+└── run-dev.ps1        # Dev startup script
 ```
 
 ## API Endpoints
@@ -200,26 +200,16 @@ facul-student-hub/
 
 ### Directory Structure Details
 
-- `backend/src/controllers/` - Business logic
-- `backend/src/middleware/` - Custom middleware (auth, error handling)
-- `backend/src/routes/` - API route definitions
-- `backend/src/store/` - In-memory data store and helper functions
-- `src/components/` - Reusable React components
-- `src/contexts/` - React context providers
-- `src/services/` - API integration services
+
 
 ### Available Scripts
 
 - `npm run dev` - Start the frontend development server
-- `python -m uvicorn main:app --reload` - Start the backend server
+- `python -m uvicorn src.main:app --reload` - Start the backend server
 - `npm run build` - Build frontend for production
 - `npm run preview` - Preview production build
 
-### Database Tools
 
-- `python database_manager.py` - Run database migrations and setup
-- `python view_database.py` - View current database contents (users, classes, attendance, etc.)
-- `python create_demo_users.py` - Create demo users and sample data
 
 ## Deployment
 

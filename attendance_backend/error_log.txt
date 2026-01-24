@@ -1,0 +1,210 @@
+
+[START_SESSION] ERROR: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column "latitude" of relation "attendance_sessions" does not exist
+[SQL: 
+                INSERT INTO attendance_sessions (class_id, start_time, status, generated_code, latitude, longitude, radius_meters)
+                VALUES ($1, $2, 'ACTIVE', $3, $4, $5, $6)
+                RETURNING session_id, class_id, start_time, status, generated_code, latitude, longitude, radius_meters
+                ]
+[parameters: (45, datetime.datetime(2026, 1, 24, 23, 45, 21, 197526), 'VNC0JG', None, None, 50)]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 521, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 768, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\asyncpg\connection.py", line 638, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\asyncpg\connection.py", line 657, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\asyncpg\connection.py", line 443, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 165, in prepare
+asyncpg.exceptions.UndefinedColumnError: column "latitude" of relation "attendance_sessions" does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 580, in execute
+    self._adapt_connection.await_(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 558, in _prepare_and_execute
+    self._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 508, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 792, in _handle_exception
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: <class 'asyncpg.exceptions.UndefinedColumnError'>: column "latitude" of relation "attendance_sessions" does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\achyu\OneDrive\Documents\GitHub\facul-student-hub\attendance_backend\src\routers\faculty.py", line 151, in start_session
+    res = await conn.execute(sql, {
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\ext\asyncio\engine.py", line 658, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 580, in execute
+    self._adapt_connection.await_(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 558, in _prepare_and_execute
+    self._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 508, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 792, in _handle_exception
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column "latitude" of relation "attendance_sessions" does not exist
+[SQL: 
+                INSERT INTO attendance_sessions (class_id, start_time, status, generated_code, latitude, longitude, radius_meters)
+                VALUES ($1, $2, 'ACTIVE', $3, $4, $5, $6)
+                RETURNING session_id, class_id, start_time, status, generated_code, latitude, longitude, radius_meters
+                ]
+[parameters: (45, datetime.datetime(2026, 1, 24, 23, 45, 21, 197526), 'VNC0JG', None, None, 50)]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+[START_SESSION] ERROR: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column "latitude" of relation "attendance_sessions" does not exist
+[SQL: 
+                INSERT INTO attendance_sessions (class_id, start_time, status, generated_code, latitude, longitude, radius_meters)
+                VALUES ($1, $2, 'ACTIVE', $3, $4, $5, $6)
+                RETURNING session_id, class_id, start_time, status, generated_code, latitude, longitude, radius_meters
+                ]
+[parameters: (45, datetime.datetime(2026, 1, 24, 23, 46, 58, 984688), 'O50GX6', None, None, 50)]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 521, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 768, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\asyncpg\connection.py", line 638, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\asyncpg\connection.py", line 657, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\asyncpg\connection.py", line 443, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 165, in prepare
+asyncpg.exceptions.UndefinedColumnError: column "latitude" of relation "attendance_sessions" does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 580, in execute
+    self._adapt_connection.await_(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 558, in _prepare_and_execute
+    self._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 508, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 792, in _handle_exception
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: <class 'asyncpg.exceptions.UndefinedColumnError'>: column "latitude" of relation "attendance_sessions" does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\achyu\OneDrive\Documents\GitHub\facul-student-hub\attendance_backend\src\routers\faculty.py", line 151, in start_session
+    res = await conn.execute(sql, {
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\ext\asyncio\engine.py", line 658, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 580, in execute
+    self._adapt_connection.await_(
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 558, in _prepare_and_execute
+    self._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 508, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "C:\Users\achyu\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 792, in _handle_exception
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column "latitude" of relation "attendance_sessions" does not exist
+[SQL: 
+                INSERT INTO attendance_sessions (class_id, start_time, status, generated_code, latitude, longitude, radius_meters)
+                VALUES ($1, $2, 'ACTIVE', $3, $4, $5, $6)
+                RETURNING session_id, class_id, start_time, status, generated_code, latitude, longitude, radius_meters
+                ]
+[parameters: (45, datetime.datetime(2026, 1, 24, 23, 46, 58, 984688), 'O50GX6', None, None, 50)]
+(Background on this error at: https://sqlalche.me/e/20/f405)

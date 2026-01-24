@@ -60,11 +60,11 @@ pip install -r requirements.txt
 
 # Start backend server in background
 echo_status "Starting backend server..."
-python -m uvicorn main:app --reload &
+python -m uvicorn src.main:app --reload &
 BACKEND_PID=$!
 
 # Go back to root directory
-cd ..
+cd ../frontend
 
 # Install frontend dependencies
 echo_status "Installing frontend dependencies..."
