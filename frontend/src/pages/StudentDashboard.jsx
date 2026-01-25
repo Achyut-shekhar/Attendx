@@ -188,6 +188,8 @@ const StudentDashboard = () => {
   const [rollNumber, setRollNumber] = useState("");
   const [section, setSection] = useState("");
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
+  const [isJoiningClass, setIsJoiningClass] = useState(false);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
 
   const [selectedClass, setSelectedClass] = useState(null); // ✅ stores the class for which student enters code
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -269,6 +271,7 @@ const StudentDashboard = () => {
     }
 
     try {
+      setIsJoiningClass(true);
       await studentAPI.joinClass(joinCode, rollNumber, section);
       toast({
         title: "Successfully Joined",
@@ -285,6 +288,8 @@ const StudentDashboard = () => {
         description: "Invalid join code.",
         variant: "destructive",
       });
+    } finally {
+      setIsJoiningClass(false);
     }
   };
 
@@ -380,6 +385,7 @@ const StudentDashboard = () => {
     }
 
     try {
+      setIsSubmittingAttendance(true);
       const user = JSON.parse(localStorage.getItem("user"));
       const finalCode = enteredCode.toUpperCase();
 
@@ -425,6 +431,8 @@ const StudentDashboard = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingAttendance(false);
     }
   };
 
@@ -543,11 +551,21 @@ const StudentDashboard = () => {
                   variant="outline"
                   onClick={() => setIsJoinDialogOpen(false)}
                   className="h-10 sm:h-11"
+                  disabled={isJoiningClass}
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleJoinClass} className="h-10 sm:h-11">
-                  Join
+                <Button 
+                  onClick={handleJoinClass} 
+                  className="h-10 sm:h-11"
+                  disabled={isJoiningClass}
+                >
+                  {isJoiningClass ? (
+                    <span className="flex items-center gap-2">
+                      <Loader className="h-4 w-4 animate-spin" />
+                      Joining...
+                    </span>
+                  ) : "Join"}
                 </Button>
               </div>
             </DialogContent>
@@ -922,10 +940,19 @@ const StudentDashboard = () => {
               </Button>
               <Button
                 onClick={handleCodeSubmit}
-                disabled={!enteredCode.trim()}
+                disabled={!enteredCode.trim() || isSubmittingAttendance}
                 className="min-h-[44px] w-full sm:w-auto"
               >
-                {studentLocation ? "Submit with Location ✓" : "Submit Code"}
+                {isSubmittingAttendance ? (
+                  <span className="flex items-center gap-2">
+                    <Loader className="h-4 w-4 animate-spin" />
+                    Submitting...
+                  </span>
+                ) : studentLocation ? (
+                  "Submit with Location ✓"
+                ) : (
+                  "Submit Code"
+                )}
               </Button>
             </div>
           </DialogContent>

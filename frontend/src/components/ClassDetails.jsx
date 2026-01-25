@@ -605,10 +605,10 @@ const ClassDetails = ({ classItem }) => {
 
     if (pollRef.current) clearInterval(pollRef.current);
 
-    // Live update every 2s
+    // Live update every 10s
     pollRef.current = setInterval(() => {
       loadSessionAttendance(selectedSession, true);
-    }, 2000);
+    }, 10000);
 
     return () => pollRef.current && clearInterval(pollRef.current);
   }, [selectedSession]);

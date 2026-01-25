@@ -102,36 +102,36 @@ export const NotificationProvider = ({ children }) => {
     if (!user?.user_id) return;
 
     console.log(
-      "[Notifications] Starting polling interval for user:",
+      "[Notifications] Starting polling interval (20s) for user:",
       user.user_id
     );
 
     const interval = setInterval(async () => {
+      // Use a functional update style check or ref if needed, 
+      // but simple fetch is okay with longer interval
       try {
-        // Check unread count first without fetching all notifications
         const data = await notificationApi.getUnreadCount(user.user_id);
         const newCount = data?.count || 0;
-        console.log(
-          "[Notifications] Poll result - server count:",
-          newCount,
-          "local count:",
-          unreadCount
-        );
-
-        if (newCount !== unreadCount) {
-          // Fetch full list and show toast if count increased
-          loadNotifications(newCount > unreadCount);
-        }
+        
+        // We Use a ref or local closure to check against current state 
+        // to avoid dependency issues
+        setUnreadCount(currentCount => {
+          if (newCount !== currentCount) {
+            // Fetch full list if count changed
+            loadNotifications(newCount > currentCount);
+          }
+          return newCount;
+        });
       } catch (error) {
         console.error("[Notifications] Polling error:", error);
       }
-    }, 5000); // Check every 5 seconds
+    }, 20000); // Check every 20 seconds instead of 5
 
     return () => {
       console.log("[Notifications] Clearing polling interval");
       clearInterval(interval);
     };
-  }, [user?.user_id, unreadCount, loadNotifications]);
+  }, [user?.user_id, loadNotifications]);
 
   const markAsRead = async (notificationId) => {
     try {

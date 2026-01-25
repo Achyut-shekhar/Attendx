@@ -51,7 +51,7 @@ const Attendance = () => {
     };
 
     loadData(); // run immediately
-    const interval = setInterval(loadData, 3000);
+    const interval = setInterval(loadData, 10000);
 
     return () => clearInterval(interval);
   }, [classId, sessionId]);

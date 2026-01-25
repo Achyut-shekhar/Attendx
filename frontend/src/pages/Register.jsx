@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   UserCircle2,
+  Loader,
 } from "lucide-react";
 import { Button } from "@/components/ui/enhanced-button";
 import { Input } from "@/components/ui/input";
@@ -235,7 +236,14 @@ const Register = () => {
               </div>
 
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Registering..." : "Register"}
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader className="h-4 w-4 animate-spin" />
+                    Registering...
+                  </span>
+                ) : (
+                  "Register"
+                )}
               </Button>
 
               <div className="text-center text-sm">

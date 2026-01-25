@@ -99,7 +99,7 @@ python database_manager.py
 4. Start the backend server:
 
 ```bash
-python -m uvicorn src.main:app --reload
+python -m uvicorn main:app --reload
 ```
 
 The backend will be running at http://127.0.0.1:8000
@@ -135,9 +135,7 @@ The frontend will be running at http://localhost:5173
 
 #### Stopping the Servers
 
-- If using PowerShell script: The script handles cleanup automatically
-- If running manually: Use Ctrl+C in each terminal window
-- If processes are stuck: Run `taskkill /F /IM node.exe` (Windows) or `pkill node` (Unix)
+- Use Ctrl+C in each terminal window to stop the servers
 
 ### Test Credentials
 
@@ -173,7 +171,7 @@ facul-student-hub/
 │   └── vite.config.js
 │
 ├── docs/               # Documentation
-└── run-dev.ps1        # Dev startup script
+└── docs/               # Documentation
 ```
 
 ## API Endpoints
@@ -205,7 +203,7 @@ facul-student-hub/
 ### Available Scripts
 
 - `npm run dev` - Start the frontend development server
-- `python -m uvicorn src.main:app --reload` - Start the backend server
+- `python -m uvicorn main:app --reload` - Start the backend server
 - `npm run build` - Build frontend for production
 - `npm run preview` - Preview production build
 
