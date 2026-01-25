@@ -68,34 +68,34 @@ async def join_class(join_data: JoinClassRequest):
                 "section": section_value
             })
             
-            # Notifications
-            student_sql = text("SELECT name FROM users WHERE user_id = :uid")
-            s_row = (await conn.execute(student_sql, {"uid": join_data.student_id})).fetchone()
-            student_name = s_row[0] if s_row else "Unknown Student"
+            # Notifications (DISABLED)
+            # student_sql = text("SELECT name FROM users WHERE user_id = :uid")
+            # s_row = (await conn.execute(student_sql, {"uid": join_data.student_id})).fetchone()
+            # student_name = s_row[0] if s_row else "Unknown Student"
             
-            class_detail_sql = text("SELECT class_name, faculty_id FROM classes WHERE class_id = :cid")
-            c_row = (await conn.execute(class_detail_sql, {"cid": class_id})).fetchone()
-            class_name = c_row[0] if c_row else "Unknown Class"
-            faculty_id = c_row[1] if c_row else None
+            # class_detail_sql = text("SELECT class_name, faculty_id FROM classes WHERE class_id = :cid")
+            # c_row = (await conn.execute(class_detail_sql, {"cid": class_id})).fetchone()
+            # class_name = c_row[0] if c_row else "Unknown Class"
+            # faculty_id = c_row[1] if c_row else None
             
-            await create_notification(
-                user_id=join_data.student_id,
-                type="class_joined",
-                title="Joined Class",
-                message=f"You have successfully joined {class_name}",
-                priority="low",
-                related_class_id=class_id
-            )
+            # await create_notification(
+            #     user_id=join_data.student_id,
+            #     type="class_joined",
+            #     title="Joined Class",
+            #     message=f"You have successfully joined {class_name}",
+            #     priority="low",
+            #     related_class_id=class_id
+            # )
             
-            if faculty_id:
-                await create_notification(
-                    user_id=faculty_id,
-                    type="student_joined",
-                    title="New Student",
-                    message=f"{student_name} has joined your {class_name} class",
-                    priority="low",
-                    related_class_id=class_id
-                )
+            # if faculty_id:
+            #     await create_notification(
+            #         user_id=faculty_id,
+            #         type="student_joined",
+            #         title="New Student",
+            #         message=f"{student_name} has joined your {class_name} class",
+            #         priority="low",
+            #         related_class_id=class_id
+            #     )
             
             return {"message": "Successfully joined class", "class_id": class_id}
     except HTTPException:
@@ -173,45 +173,46 @@ async def submit_code(payload: SubmitAttendanceCode):
                 await conn.execute(insert_sql, {"ses": session_id, "sid": payload.student_id, "status": status})
             
             # Notifications
+            # Notifications (DISABLED for scalability)
             class_sql = text("SELECT class_name, faculty_id FROM classes WHERE class_id = :cid")
             c_row = (await conn.execute(class_sql, {"cid": class_id})).fetchone()
             class_name = c_row.class_name
-            faculty_id = c_row.faculty_id
+            # faculty_id = c_row.faculty_id
             
-            student_sql = text("SELECT name FROM users WHERE user_id = :uid")
-            s_row = (await conn.execute(student_sql, {"uid": payload.student_id})).fetchone()
-            student_name = s_row.name or "A student"
+            # student_sql = text("SELECT name FROM users WHERE user_id = :uid")
+            # s_row = (await conn.execute(student_sql, {"uid": payload.student_id})).fetchone()
+            # student_name = s_row.name or "A student"
             
-            if status == "ABSENT":
-                await create_notification(
-                    user_id=payload.student_id,
-                    type="attendance_marked",
-                    title="Attendance: Outside Zone",
-                    message=f"You were outside the classroom radius for {class_name}{location_message}",
-                    priority="high",
-                    related_class_id=class_id,
-                    related_session_id=session_id
-                )
-            else:
-                 await create_notification(
-                    user_id=payload.student_id,
-                    type="attendance_marked",
-                    title="Attendance Confirmed",
-                    message=f"Your attendance has been recorded as {status} for {class_name}{location_message}",
-                    priority="low",
-                    related_class_id=class_id,
-                    related_session_id=session_id
-                )
+            # if status == "ABSENT":
+            #     await create_notification(
+            #         user_id=payload.student_id,
+            #         type="attendance_marked",
+            #         title="Attendance: Outside Zone",
+            #         message=f"You were outside the classroom radius for {class_name}{location_message}",
+            #         priority="high",
+            #         related_class_id=class_id,
+            #         related_session_id=session_id
+            #     )
+            # else:
+            #      await create_notification(
+            #         user_id=payload.student_id,
+            #         type="attendance_marked",
+            #         title="Attendance Confirmed",
+            #         message=f"Your attendance has been recorded as {status} for {class_name}{location_message}",
+            #         priority="low",
+            #         related_class_id=class_id,
+            #         related_session_id=session_id
+            #     )
             
-            await create_notification(
-                user_id=faculty_id,
-                type="student_marked",
-                title="Student Attendance",
-                message=f"{student_name} marked attendance for {class_name} ({status})",
-                priority="low",
-                related_class_id=class_id,
-                related_session_id=session_id
-            )
+            # await create_notification(
+            #     user_id=faculty_id,
+            #     type="student_marked",
+            #     title="Student Attendance",
+            #     message=f"{student_name} marked attendance for {class_name} ({status})",
+            #     priority="low",
+            #     related_class_id=class_id,
+            #     related_session_id=session_id
+            # )
 
             return {
                 "message": f"Attendance marked as {status}{location_message}",
