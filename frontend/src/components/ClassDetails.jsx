@@ -58,6 +58,99 @@ const ClassDetails = ({ classItem }) => {
   /* ---------------------------------------------------
      Export attendance to Excel
   --------------------------------------------------- */
+  // Helper to format rows for Excel
+  const formatRowsForExport = (rows, sessionDate, sessionTime) => {
+    // 1. Group by Section
+    const sections = {};
+    rows.forEach((r) => {
+      const sec = r.section || "Unassigned";
+      if (!sections[sec]) sections[sec] = [];
+      sections[sec].push(r);
+    });
+
+    const exportRows = [];
+
+    // Header Info
+    exportRows.push({ "Student Name": `Class: ${classItem.class_name}` });
+    exportRows.push({ "Student Name": `Date: ${sessionDate}` });
+    exportRows.push({ "Student Name": `Time: ${sessionTime}` });
+    exportRows.push({}); // spacer
+
+    const colHeaders = {
+      "Roll Number": "Roll Number",
+      "Student Name": "Student Name",
+      Section: "Section",
+      Status: "Status",
+      "Marked At": "Marked At",
+    };
+
+    // 2. Process each section
+    Object.keys(sections)
+      .sort()
+      .forEach((sec) => {
+        const students = sections[sec];
+
+        // Separation
+        const presentList = students
+          .filter(s => s.status === 'PRESENT' || s.status === 'LATE')
+          .sort((a, b) => a.student_name.localeCompare(b.student_name));
+          
+        const absentList = students
+          .filter(s => s.status === 'ABSENT' || !s.status)
+          .sort((a, b) => a.student_name.localeCompare(b.student_name));
+
+        // --- SECTION HEADER ---
+        exportRows.push({ "Student Name": `SECTION: ${sec}` });
+        
+        // --- PRESENT BLOCK ---
+        if (presentList.length > 0) {
+           exportRows.push({ "Student Name": `--- PRESENT (${presentList.length}) ---` });
+           exportRows.push(colHeaders);
+           presentList.forEach(r => {
+             exportRows.push({
+              "Roll Number": r.roll_number || "—",
+              Section: r.section || "—",
+              "Student Name": r.student_name,
+              Status: r.status === "LATE" ? "PRESENT" : "PRESENT",
+              "Marked At": r.marked_at
+                ? new Date(r.marked_at + "Z").toLocaleString("en-IN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })
+                : "—",
+            });
+           });
+           exportRows.push({}); // spacer
+        }
+
+        // --- ABSENT BLOCK ---
+        if (absentList.length > 0) {
+           exportRows.push({ "Student Name": `--- ABSENT (${absentList.length}) ---` });
+           exportRows.push(colHeaders);
+           absentList.forEach(r => {
+             exportRows.push({
+              "Roll Number": r.roll_number || "—",
+              Section: r.section || "—",
+              "Student Name": r.student_name,
+              Status: "ABSENT",
+              "Marked At": "—",
+            });
+           });
+           exportRows.push({}); // spacer
+        }
+
+        // Section Summary 
+        exportRows.push({ "Student Name": `Total Present: ${presentList.length}` });
+        exportRows.push({ "Student Name": `Total Absent: ${absentList.length}` });
+        exportRows.push({ "Student Name": `Total Strength: ${presentList.length + absentList.length}` });
+        exportRows.push({}); // large spacer between sections
+        exportRows.push({}); 
+      });
+
+      return exportRows;
+  };
+
   // Export current session only
   const exportCurrentSession = () => {
     if (rows.length === 0) {
@@ -69,71 +162,38 @@ const ClassDetails = ({ classItem }) => {
       return;
     }
 
-    // Prepare data for export
-    const exportData = rows.map((r) => ({
-      "Roll Number": r.roll_number || "—",
-      Section: r.section || "—",
-      "Student Name": r.student_name,
-      Status: r.status === "LATE" ? "PRESENT" : r.status,
-      "Marked At": r.marked_at
-        ? new Date(r.marked_at + "Z").toLocaleString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        : "—",
-    }));
+    const sessionInfo = sessions.find((s) => s.session_id === selectedSession);
+    const sessionTime = sessionInfo
+      ? new Date(sessionInfo.start_time).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+      : "Unknown Time";
 
-    // Add summary row
-    exportData.push({});
-    exportData.push({
-      "Roll Number": "",
-      Section: "",
-      "Student Name": "SUMMARY",
-      Status: "",
-      "Marked At": "",
-    });
-    exportData.push({
-      "Roll Number": "",
-      Section: "",
-      "Student Name": "Present",
-      Status: totals.present,
-      "Marked At": "",
-    });
-    exportData.push({
-      "Roll Number": "",
-      Section: "",
-      "Student Name": "Late",
-      Status: totals.late,
-      "Marked At": "",
-    });
-    exportData.push({
-      "Roll Number": "",
-      Section: "",
-      "Student Name": "Absent",
-      Status: totals.absent,
-      "Marked At": "",
-    });
+    // Use the new helper
+    const exportData = formatRowsForExport(rows, selectedDate, sessionTime);
 
     // Create worksheet
-    const ws = XLSX.utils.json_to_sheet(exportData);
+    const ws = XLSX.utils.json_to_sheet(exportData, { skipHeader: true });
+
+    // Auto-width columns roughly
+    const wscols = [
+      { wch: 15 }, // Roll
+      { wch: 10 }, // Section
+      { wch: 30 }, // Name
+      { wch: 15 }, // Status
+      { wch: 20 }, // Marked At
+    ];
+    ws["!cols"] = wscols;
 
     // Create workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
 
     // Generate filename
-    const sessionInfo = sessions.find((s) => s.session_id === selectedSession);
-    const sessionTime = sessionInfo
-      ? new Date(sessionInfo.start_time)
-          .toLocaleTimeString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          })
-          .replace(/:/g, "-")
-      : "session";
-    const filename = `${classItem.class_name}_${selectedDate}_${sessionTime}.xlsx`;
+    const timeStr = sessionTime.replace(/:/g, "-");
+    const filename = `${classItem.class_name}_${selectedDate}_${timeStr}.xlsx`;
 
     // Download file
     XLSX.writeFile(wb, filename);
@@ -172,46 +232,28 @@ const ClassDetails = ({ classItem }) => {
         );
         const recs = Array.isArray(data?.records) ? data.records : [];
 
-        const exportData = recs.map((r) => ({
-          "Roll Number": r.roll_number || "—",
-          Section: r.section || "—",
-          "Student Name": r.student_name,
-          Status: r.status === "LATE" ? "PRESENT" : r.status,
-          "Marked At": r.marked_at
-            ? new Date(r.marked_at + "Z").toLocaleString()
-            : "—",
-        }));
-
-        // Add summary
-        const present = recs.filter(
-          (x) => x.status === "PRESENT" || x.status === "LATE"
-        ).length;
-        const absent = recs.filter((x) => x.status === "ABSENT").length;
-
-        exportData.push({});
-        exportData.push({
-          "Roll Number": "",
-          Section: "",
-          "Student Name": "SUMMARY",
-          Status: "",
-          "Marked At": "",
-        });
-        exportData.push({
-          "Roll Number": "",
-          Section: "",
-          "Student Name": "Present",
-          Status: present,
-          "Marked At": "",
-        });
-        exportData.push({
-          "Roll Number": "",
-          Section: "",
-          "Student Name": "Absent",
-          Status: absent,
-          "Marked At": "",
+        // Get time
+        const sTime = new Date(session.start_time).toLocaleTimeString("en-IN", {
+           hour: "2-digit",
+           minute: "2-digit",
+           hour12: false
         });
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
+        // Use helper
+        const exportData = formatRowsForExport(recs, selectedDate, sTime);
+
+        const ws = XLSX.utils.json_to_sheet(exportData, { skipHeader: true });
+        
+        // Auto-width columns
+        const wscols = [
+          { wch: 15 }, 
+          { wch: 10 }, 
+          { wch: 30 }, 
+          { wch: 15 }, 
+          { wch: 20 }, 
+        ];
+        ws["!cols"] = wscols;
+
         // Use index to ensure unique sheet names
         const sheetName = `Session_${i + 1}`;
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
