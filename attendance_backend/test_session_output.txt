@@ -1,3 +1,0 @@
-Sending POST request...
-Status: 500
-Response: {"detail":"Database schema outdated. Please run migration to add location columns."}
