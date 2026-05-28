@@ -4,7 +4,7 @@ from sqlalchemy import text
 from src.core.database import engine
 from src.core.security import verify_password, get_password_hash, create_access_token, create_reset_token, create_reset_token_expiry
 from src.core.email import send_password_reset_email
-from src.models.schemas import LoginRequest, RegisterRequest, ForgotPasswordRequest, ResetPasswordRequest
+from src.models.schemas import LoginRequest, RegisterRequest, ForgotPasswordRequest, ResetPasswordRequest, DeleteAccountRequest
 
 router = APIRouter(tags=["auth"])
 
@@ -272,3 +272,112 @@ async def reset_password(request: ResetPasswordRequest):
     except Exception as e:
         print(f"[RESET_PASSWORD] ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to reset password")
+
+
+@router.delete("/delete-account")
+async def delete_account(request: DeleteAccountRequest):
+    """Delete a user account and all associated data after password verification"""
+    try:
+        async with engine.begin() as conn:
+            # 1. Fetch user to verify password
+            user_sql = text(
+                "SELECT user_id, name, email, password_hash, role FROM users WHERE user_id = :user_id"
+            )
+            result = await conn.execute(user_sql, {"user_id": request.user_id})
+            row = result.fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            user = dict(row._mapping)
+
+            # 2. Verify password
+            password_valid = False
+            if user["password_hash"].startswith("$2b$"):
+                password_valid = verify_password(request.password, user["password_hash"])
+            else:
+                password_valid = (request.password == user["password_hash"])
+
+            if not password_valid:
+                raise HTTPException(status_code=401, detail="Incorrect password")
+
+            # 3. Delete all related data (cascade)
+            user_id = user["user_id"]
+            role = user["role"]
+
+            # Delete password reset tokens
+            await conn.execute(
+                text("DELETE FROM password_reset_tokens WHERE user_id = :user_id"),
+                {"user_id": user_id}
+            )
+
+            if role == "FACULTY":
+                # For faculty: delete attendance records for their sessions, then sessions, then classes
+                # Get all class IDs owned by this faculty
+                class_ids_result = await conn.execute(
+                    text("SELECT class_id FROM classes WHERE faculty_id = :user_id"),
+                    {"user_id": user_id}
+                )
+                class_ids = [r[0] for r in class_ids_result.fetchall()]
+
+                if class_ids:
+                    # Delete attendance records for sessions in these classes
+                    await conn.execute(
+                        text("""
+                            DELETE FROM attendance_records 
+                            WHERE session_id IN (
+                                SELECT session_id FROM attendance_sessions 
+                                WHERE class_id = ANY(:class_ids)
+                            )
+                        """),
+                        {"class_ids": class_ids}
+                    )
+
+                    # Delete attendance sessions for these classes
+                    await conn.execute(
+                        text("DELETE FROM attendance_sessions WHERE class_id = ANY(:class_ids)"),
+                        {"class_ids": class_ids}
+                    )
+
+                    # Delete class enrollments for these classes
+                    await conn.execute(
+                        text("DELETE FROM class_enrollments WHERE class_id = ANY(:class_ids)"),
+                        {"class_ids": class_ids}
+                    )
+
+                    # Delete the classes themselves
+                    await conn.execute(
+                        text("DELETE FROM classes WHERE faculty_id = :user_id"),
+                        {"user_id": user_id}
+                    )
+
+            elif role == "STUDENT":
+                # For students: delete their attendance records and class enrollments
+                await conn.execute(
+                    text("DELETE FROM attendance_records WHERE student_id = :user_id"),
+                    {"user_id": user_id}
+                )
+                await conn.execute(
+                    text("DELETE FROM class_enrollments WHERE student_id = :user_id"),
+                    {"user_id": user_id}
+                )
+
+            # 4. Finally, delete the user
+            await conn.execute(
+                text("DELETE FROM users WHERE user_id = :user_id"),
+                {"user_id": user_id}
+            )
+
+            print(f"✅ Account deleted successfully for user_id={user_id} ({user['email']})")
+
+            return {
+                "message": "Account deleted successfully",
+                "success": True
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[DELETE_ACCOUNT] ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete account: {str(e)}")
+

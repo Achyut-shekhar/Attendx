@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import text, bindparam
 from src.core.database import engine
 from src.core.utils import generate_code
-from src.models.schemas import CreateClassRequest, StartSessionRequest, MarkAttendanceRequest
+from src.models.schemas import CreateClassRequest, StartSessionRequest, MarkAttendanceRequest, AdminResetPasswordRequest
 from src import queries
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -469,4 +469,68 @@ async def get_session_attendance_flat(session_id: int):
             result = await conn.execute(sql, {"session_id": session_id})
             return [dict(r._mapping) for r in result]
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------- FACULTY ADMIN: RESET PASSWORD --------------------
+
+@router.get("/api/faculty/users")
+async def list_all_users():
+    """List all users (students + faculty) for the password reset picker."""
+    try:
+        sql = text(
+            """
+            SELECT user_id, name, email, role
+            FROM users
+            ORDER BY role, name
+            """
+        )
+        async with engine.connect() as conn:
+            result = await conn.execute(sql)
+            return [dict(r._mapping) for r in result]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/faculty/admin/reset-password")
+async def admin_reset_password(request: AdminResetPasswordRequest):
+    """Faculty-only: directly reset any user's password (no email token required)."""
+    try:
+        if len(request.new_password) < 6:
+            raise HTTPException(
+                status_code=400,
+                detail="Password must be at least 6 characters long"
+            )
+
+        from src.core.security import get_password_hash
+        new_hash = get_password_hash(request.new_password)
+
+        async with engine.begin() as conn:
+            # Verify user exists
+            check_sql = text("SELECT user_id, name, email FROM users WHERE user_id = :user_id")
+            result = await conn.execute(check_sql, {"user_id": request.user_id})
+            user = result.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Update password
+            update_sql = text(
+                "UPDATE users SET password_hash = :password_hash WHERE user_id = :user_id"
+            )
+            await conn.execute(update_sql, {
+                "password_hash": new_hash,
+                "user_id": request.user_id
+            })
+
+        user_data = dict(user._mapping)
+        print(f"[ADMIN_RESET] Password reset for user_id={request.user_id} ({user_data['email']})")
+        return {
+            "message": f"Password for {user_data['name']} has been reset successfully",
+            "success": True
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ADMIN_RESET] ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

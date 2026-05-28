@@ -38,10 +38,10 @@ You will be prompted for:
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+py -m pip install -r requirements.txt
 
 # Run locally
-uvicorn src.main:app --reload
+py main.py
 ```
 
 ## Database Migration

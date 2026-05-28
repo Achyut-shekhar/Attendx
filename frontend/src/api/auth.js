@@ -68,9 +68,32 @@ async function getProfile() {
   return response.json();
 }
 
+// 🔴 DELETE ACCOUNT API
+async function deleteAccount(userId, password) {
+  try {
+    const response = await fetch(`${API_URL}/delete-account`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ user_id: userId, password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to delete account");
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Delete Account API error:", error);
+    throw error;
+  }
+}
 // ✅ Export object for AuthContext
 export const authApi = {
   login,
   register,   // ✅ added here
   getProfile,
+  deleteAccount,
 };

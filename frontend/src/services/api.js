@@ -166,6 +166,20 @@ export const facultyAPI = {
     );
     return data;
   },
+
+  // -------------------- Admin: Reset Password --------------------
+  async listAllUsers() {
+    const { data } = await api.get(`/faculty/users`);
+    return data;
+  },
+
+  async adminResetPassword(user_id, new_password) {
+    const { data } = await api.post(`/faculty/admin/reset-password`, {
+      user_id,
+      new_password,
+    });
+    return data;
+  },
 };
 
 /* -----------------------------------------------------------

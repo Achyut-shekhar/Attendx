@@ -56,3 +56,13 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+class DeleteAccountRequest(BaseModel):
+    user_id: int
+    password: str  # Require password confirmation for security
+
+
+class AdminResetPasswordRequest(BaseModel):
+    user_id: int
+    new_password: str
