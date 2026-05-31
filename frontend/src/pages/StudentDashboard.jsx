@@ -401,7 +401,8 @@ const StudentDashboard = () => {
       );
 
       // Show detailed success message
-      let description = "Your attendance is recorded.";
+      const isPresent = response.status === "PRESENT";
+      let description = `Your attendance has been recorded as ${isPresent ? "PRESENT" : "ABSENT"}.`;
       if (response.distance !== null && response.distance !== undefined) {
         if (response.within_radius) {
           description = `✓ You are within the classroom radius (${Math.round(
@@ -413,16 +414,15 @@ const StudentDashboard = () => {
           )}m away). Marked as ABSENT.`;
         }
       } else if (studentLocation) {
-        description = "Your attendance is recorded with location verification.";
+        description = `Your attendance is recorded as ${isPresent ? "PRESENT" : "ABSENT"} with location verification.`;
       }
 
       toast({
-        title:
-          response.within_radius === false
-            ? "Outside Classroom Radius ⚠️"
-            : "Attendance Marked ✅",
+        title: response.within_radius === false
+          ? "Outside Classroom Radius: ABSENT ⚠️"
+          : (isPresent ? "Attendance Marked: PRESENT ✅" : "Attendance Marked: ABSENT ⚠️"),
         description: description,
-        variant: response.within_radius === false ? "destructive" : "default",
+        variant: response.within_radius === false || !isPresent ? "destructive" : "default",
       });
 
       setEnteredCode("");
