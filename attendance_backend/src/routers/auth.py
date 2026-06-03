@@ -1,9 +1,10 @@
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy import text
 from src.core.database import engine
-from src.core.security import verify_password, get_password_hash, create_access_token, create_reset_token, create_reset_token_expiry
+from src.core.security import verify_password, get_password_hash, create_access_token, create_reset_token, create_reset_token_expiry, verify_token
 from src.core.email import send_password_reset_email
+from src.core.config import FACULTY_REGISTER_KEY
 from src.models.schemas import LoginRequest, RegisterRequest, ForgotPasswordRequest, ResetPasswordRequest, DeleteAccountRequest
 
 router = APIRouter(tags=["auth"])
@@ -64,13 +65,19 @@ async def login(request: LoginRequest):
 
 @router.post("/register")
 async def register(request: RegisterRequest):
-    """Register a new user (student or faculty)"""
+    """Register a new user (student or faculty). Requires a valid registration key."""
     try:
         print(f"[REGISTER] Attempting to register: {request.email}, role={request.role}")
         
         # Validate role
         if request.role not in ["STUDENT", "FACULTY"]:
             raise HTTPException(status_code=400, detail="Role must be STUDENT or FACULTY")
+        
+        # Validate registration key (faculty only — students register freely)
+        if request.role == "FACULTY":
+            if not request.register_key or request.register_key != FACULTY_REGISTER_KEY:
+                print(f"[REGISTER] Invalid registration key for FACULTY")
+                raise HTTPException(status_code=403, detail="Invalid registration key. Contact your administrator to get the correct key.")
         
         # Validate password length
         if len(request.password) < 6:

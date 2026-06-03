@@ -156,24 +156,9 @@ export default function LocationCapture({
                 </span>
               )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-white/80 bg-white/70 p-3">
-                <p className="text-[10px] font-semibold uppercase text-green-600">
-                  Latitude
-                </p>
-                <p className="font-mono text-green-900">
-                  {location.latitude.toFixed(6)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-white/80 bg-white/70 p-3">
-                <p className="text-[10px] font-semibold uppercase text-green-600">
-                  Longitude
-                </p>
-                <p className="font-mono text-green-900">
-                  {location.longitude.toFixed(6)}
-                </p>
-              </div>
-            </div>
+            <p className="text-xs text-green-700">
+              Your location will be verified against the classroom zone when you submit the attendance code.
+            </p>
           </div>
         )}
 

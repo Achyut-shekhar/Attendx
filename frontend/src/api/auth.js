@@ -71,10 +71,12 @@ async function getProfile() {
 // 🔴 DELETE ACCOUNT API
 async function deleteAccount(userId, password) {
   try {
+    const token = localStorage.getItem("token");
     const response = await fetch(`${API_URL}/delete-account`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ user_id: userId, password }),
     });

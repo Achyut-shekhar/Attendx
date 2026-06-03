@@ -6,14 +6,13 @@ from src.routers import auth, faculty, student
 
 app = FastAPI(title="Attendance Management API")
 
-# CORS
+# CORS — only allow known origins, never wildcard
 origins = [
     "http://127.0.0.1:5173",
     "http://localhost:5173",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
     FRONTEND_URL,
-    "*",
 ]
 
 app.add_middleware(
@@ -70,7 +69,7 @@ def handler(event, context):
     ):
 
         async def process_sqs_batch():
-            from src.routers.student import submit_code, SubmitAttendanceCode
+            from src.routers.student import _submit_code_internal, SubmitAttendanceCode
 
             failed_message_ids = []
 
@@ -82,7 +81,7 @@ def handler(event, context):
                     payload = SubmitAttendanceCode(**body)
 
                     # ---> EXECUTE YOUR BULK DATABASE INSERT HERE <---
-                    await submit_code(payload)
+                    await _submit_code_internal(payload)
                     print(
                         f"✅ SQS Processed Attendance for Student {payload.student_id}"
                     )

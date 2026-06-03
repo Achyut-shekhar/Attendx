@@ -28,6 +28,9 @@ def get_password_hash(password: str) -> str:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""
     to_encode = data.copy()
+    # JWT spec requires 'sub' to be a string
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -41,13 +44,32 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
+        user_id_raw = payload.get("sub")
         role: str = payload.get("role")
-        if user_id is None:
+        if user_id_raw is None:
             raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        # Parse sub back to int (it was stringified during token creation)
+        try:
+            user_id = int(user_id_raw)
+        except (ValueError, TypeError):
+            user_id = user_id_raw
         return {"user_id": user_id, "role": role}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+
+
+def require_faculty(current_user: dict = Depends(verify_token)) -> dict:
+    """Dependency: requires a valid JWT with the FACULTY role."""
+    if current_user.get("role") != "FACULTY":
+        raise HTTPException(status_code=403, detail="Faculty access required")
+    return current_user
+
+
+def require_student(current_user: dict = Depends(verify_token)) -> dict:
+    """Dependency: requires a valid JWT with the STUDENT role."""
+    if current_user.get("role") != "STUDENT":
+        raise HTTPException(status_code=403, detail="Student access required")
+    return current_user
 
 
 def create_reset_token() -> str:
@@ -58,3 +80,4 @@ def create_reset_token() -> str:
 def create_reset_token_expiry() -> datetime:
     """Create expiration time for reset token (1 hour from now)"""
     return datetime.utcnow() + timedelta(hours=1)
+

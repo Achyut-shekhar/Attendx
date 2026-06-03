@@ -8,6 +8,7 @@ import {
   EyeOff,
   UserCircle2,
   Loader,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/enhanced-button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ const Register = () => {
     password: "",
     confirmPassword: "",
     role: "STUDENT",
+    register_key: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -53,6 +55,13 @@ const Register = () => {
         !formData.confirmPassword
       ) {
         setError("Please fill in all required fields");
+        setIsLoading(false);
+        return;
+      }
+
+      // Faculty must provide a registration key
+      if (formData.role === "FACULTY" && !formData.register_key) {
+        setError("Faculty registration requires a registration key");
         setIsLoading(false);
         return;
       }
@@ -234,6 +243,28 @@ const Register = () => {
                   </div>
                 </RadioGroup>
               </div>
+
+              {formData.role === "FACULTY" && (
+                <div className="space-y-2">
+                  <Label htmlFor="register_key">Registration Key</Label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                    <Input
+                      id="register_key"
+                      type="text"
+                      placeholder="Enter your registration key"
+                      className="pl-10"
+                      value={formData.register_key}
+                      onChange={(e) =>
+                        setFormData({ ...formData, register_key: e.target.value })
+                      }
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Contact your administrator for the registration key.
+                  </p>
+                </div>
+              )}
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
