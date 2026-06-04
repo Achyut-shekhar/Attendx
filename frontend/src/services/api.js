@@ -18,6 +18,33 @@ export const api = axios.create({
   withCredentials: false,
 });
 
+// Attach JWT token to every request automatically
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// On 401, only hard-redirect if the user was already logged in (token expired/revoked).
+// A 401 with NO token just means the endpoint requires auth — don't disrupt the login flow.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const hasToken = !!localStorage.getItem("token");
+      if (hasToken) {
+        // Token exists but was rejected — it expired or was invalidated. Force re-login.
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 /* -----------------------------------------------------------
    FACULTY API
 ------------------------------------------------------------ */

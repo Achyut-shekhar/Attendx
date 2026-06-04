@@ -1,5 +1,6 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
+
 
 class LoginRequest(BaseModel):
     email: str
@@ -11,6 +12,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     role: str  # "STUDENT" or "FACULTY"
+    register_key: Optional[str] = None  # Required for FACULTY only
 
 
 class CreateClassRequest(BaseModel):
@@ -39,6 +41,24 @@ class SubmitAttendanceCode(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     accuracy: Optional[float] = None  # GPS accuracy in meters
+
+    @validator("latitude")
+    def validate_latitude(cls, v):
+        if v is not None and (v < -90 or v > 90):
+            raise ValueError("Latitude must be between -90 and 90")
+        return v
+
+    @validator("longitude")
+    def validate_longitude(cls, v):
+        if v is not None and (v < -180 or v > 180):
+            raise ValueError("Longitude must be between -180 and 180")
+        return v
+
+    @validator("accuracy")
+    def validate_accuracy(cls, v):
+        if v is not None and (v <= 0 or v > 500):
+            raise ValueError("Accuracy must be between 0 and 500 meters. A value of 0 indicates spoofed location.")
+        return v
 
 
 class StartSessionRequest(BaseModel):

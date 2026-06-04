@@ -61,9 +61,10 @@ export const AttendanceProvider = ({ children }) => {
   useEffect(() => {
     const loadActiveSessions = async () => {
       try {
-        // Check if user is authenticated
+        // Check if user is authenticated AND is faculty
         const token = localStorage.getItem("token");
-        if (!token) {
+        const user = getUser();
+        if (!token || !user || user.role !== "FACULTY") {
           setLoading(false);
           return;
         }

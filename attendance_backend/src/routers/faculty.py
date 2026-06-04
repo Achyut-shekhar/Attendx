@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any
 import os
 import secrets
 from src.core.config import RESET_ADMIN_KEY
+from src.core.security import require_faculty
 
 
 router = APIRouter(tags=["faculty"])
@@ -16,7 +17,7 @@ router = APIRouter(tags=["faculty"])
 # -------------------- FACULTY DASHBOARD --------------------
 
 @router.get("/api/faculty/sessions/active")
-async def get_active_sessions(faculty_id: int):
+async def get_active_sessions(faculty_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text(
             """
@@ -35,7 +36,7 @@ async def get_active_sessions(faculty_id: int):
 
 
 @router.get("/api/faculty/{faculty_id}/classes")
-async def get_faculty_classes(faculty_id: int):
+async def get_faculty_classes(faculty_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text(
             """
@@ -53,7 +54,7 @@ async def get_faculty_classes(faculty_id: int):
 
 
 @router.post("/api/faculty/classes")
-async def create_faculty_class(class_data: CreateClassRequest):
+async def create_faculty_class(class_data: CreateClassRequest, current_user: dict = Depends(require_faculty)):
     try:
         async with engine.begin() as conn:
             # Check if a class with the same name already exists for this faculty
@@ -101,7 +102,7 @@ async def create_faculty_class(class_data: CreateClassRequest):
 
 
 @router.delete("/api/faculty/classes/{class_id}")
-async def delete_faculty_class(class_id: int):
+async def delete_faculty_class(class_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text("DELETE FROM classes WHERE class_id = :class_id RETURNING class_id")
         async with engine.begin() as conn:
@@ -114,7 +115,7 @@ async def delete_faculty_class(class_id: int):
 
 
 @router.post("/api/faculty/classes/{class_id}/sessions")
-async def start_session(class_id: int, request: StartSessionRequest = None):
+async def start_session(class_id: int, request: StartSessionRequest = None, current_user: dict = Depends(require_faculty)):
     """Start a new attendance session with generated code and optional location"""
     try:
         if request is None:
@@ -183,7 +184,7 @@ async def start_session(class_id: int, request: StartSessionRequest = None):
 
 
 @router.put("/api/faculty/classes/{class_id}/sessions/{session_id}/end")
-async def end_session(class_id: int, session_id: int):
+async def end_session(class_id: int, session_id: int, current_user: dict = Depends(require_faculty)):
     try:
         async with engine.begin() as conn:
             # Mark absent students
@@ -240,7 +241,7 @@ async def end_session(class_id: int, session_id: int):
 # ... Additional endpoints ...
 
 @router.get("/api/faculty/classes/{class_id}/sessions/by-date")
-async def get_sessions_by_date_endpoint(class_id: int, date: str):
+async def get_sessions_by_date_endpoint(class_id: int, date: str, current_user: dict = Depends(require_faculty)):
     """
     Get all sessions for a specific class on a specific date.
     Date format: YYYY-MM-DD
@@ -267,7 +268,7 @@ async def get_sessions_by_date_endpoint(class_id: int, date: str):
 
 
 @router.get("/api/faculty/classes/{class_id}/sessions/stats")
-async def get_class_sessions_stats(class_id: int):
+async def get_class_sessions_stats(class_id: int, current_user: dict = Depends(require_faculty)):
     """Return total sessions and latest session start time for a class."""
     try:
         sql = text(
@@ -291,38 +292,38 @@ async def get_class_sessions_stats(class_id: int):
 
 
 @router.get("/sessions/{date}")
-async def sessions_by_date(date: str):
+async def sessions_by_date(date: str, current_user: dict = Depends(require_faculty)):
     return await queries.get_sessions_by_date(date)
 
 
 @router.get("/session/{session_id}/attendance")
-async def attendance_for_session(session_id: int):
+async def attendance_for_session(session_id: int, current_user: dict = Depends(require_faculty)):
     return await queries.get_attendance_for_session(session_id)
 
 
 @router.get("/class/{class_id}/absent/{date}")
-async def absent_students(class_id: int, date: str):
+async def absent_students(class_id: int, date: str, current_user: dict = Depends(require_faculty)):
     return await queries.get_absent_students_in_class_on_date(class_id, date)
 
 
 @router.get("/class/{class_id}/students/below_percentage")
-async def students_below_percentage(class_id: int, threshold: Optional[float] = 75.0):
+async def students_below_percentage(class_id: int, threshold: Optional[float] = 75.0, current_user: dict = Depends(require_faculty)):
     return await queries.get_students_below_percentage(class_id, threshold)
 
 
 @router.get("/most-active-class")
-async def most_active_class():
+async def most_active_class(current_user: dict = Depends(require_faculty)):
     result = await queries.get_most_active_class()
     if not result:
         raise HTTPException(status_code=404, detail="No classes or attendance records found")
     return result
 
 @router.get("/faculty-with-classes")
-async def faculty_with_classes():
+async def faculty_with_classes(current_user: dict = Depends(require_faculty)):
     return await queries.get_faculty_with_classes()
 
 @router.get("/api/faculty/classes/{class_id}/attendance")
-async def get_session_attendance(class_id: int):
+async def get_session_attendance(class_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text(
             """
@@ -346,7 +347,7 @@ async def get_session_attendance(class_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/class/{class_id}/active-session")
-async def get_active_session(class_id: int):
+async def get_active_session(class_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text(
             """
@@ -365,7 +366,7 @@ async def get_active_session(class_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/faculty/sessions/{session_id}")
-async def get_session_by_id(session_id: int):
+async def get_session_by_id(session_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text("SELECT * FROM attendance_sessions WHERE session_id = :session_id")
         async with engine.connect() as conn:
@@ -378,7 +379,7 @@ async def get_session_by_id(session_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/faculty/classes/{class_id}/students")
-async def get_class_students(class_id: int):
+async def get_class_students(class_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text(
             """
@@ -397,7 +398,7 @@ async def get_class_students(class_id: int):
 
 
 @router.get("/api/faculty/classes/{class_id}/details")
-async def faculty_class_details(class_id: int):
+async def faculty_class_details(class_id: int, current_user: dict = Depends(require_faculty)):
     try:
         sql = text(
             """
@@ -418,7 +419,7 @@ async def faculty_class_details(class_id: int):
 
 
 @router.post("/session/{session_id}/attendance")
-async def mark_attendance_manual(session_id: int, payload: MarkAttendanceRequest):
+async def mark_attendance_manual(session_id: int, payload: MarkAttendanceRequest, current_user: dict = Depends(require_faculty)):
     try:
         status = (payload.status or "PRESENT").upper()
         if status not in ("PRESENT", "LATE", "ABSENT"):
@@ -446,7 +447,7 @@ async def mark_attendance_manual(session_id: int, payload: MarkAttendanceRequest
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/faculty/sessions/{session_id}/attendance/flat")
-async def get_session_attendance_flat(session_id: int):
+async def get_session_attendance_flat(session_id: int, current_user: dict = Depends(require_faculty)):
     """
     Get attendance for a specific session in a flat format suitable for tables.
     Includes all enrolled students and their status (PRESENT/ABSENT/LATE) for this session.
@@ -479,7 +480,7 @@ async def get_session_attendance_flat(session_id: int):
 # -------------------- FACULTY ADMIN: RESET PASSWORD --------------------
 
 @router.get("/api/faculty/users")
-async def list_all_users():
+async def list_all_users(current_user: dict = Depends(require_faculty)):
     """List all users (students + faculty) for the password reset picker."""
     try:
         sql = text(
@@ -497,7 +498,7 @@ async def list_all_users():
 
 
 @router.post("/api/faculty/admin/reset-password")
-async def admin_reset_password(request: AdminResetPasswordRequest):
+async def admin_reset_password(request: AdminResetPasswordRequest, current_user: dict = Depends(require_faculty)):
     """Faculty-only: directly reset any user's password (no email token required)."""
     try:
         # Secure comparison of admin confirmation key
@@ -556,7 +557,7 @@ async def admin_reset_password(request: AdminResetPasswordRequest):
 
 
 @router.get("/api/faculty/classes/{class_id}/sessions/all-with-attendance")
-async def get_all_sessions_with_attendance(class_id: int):
+async def get_all_sessions_with_attendance(class_id: int, current_user: dict = Depends(require_faculty)):
     """
     Get all sessions with their attendance records flat, optimized for a single export file.
     """

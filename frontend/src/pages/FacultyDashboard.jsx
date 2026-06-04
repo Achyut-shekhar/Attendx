@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { facultyAPI } from "@/services/api";
+import { facultyAPI, api } from "@/services/api";
 import {
   Plus,
   Users,
@@ -304,24 +304,20 @@ const FacultyDashboard = () => {
         // Load active sessions from backend to sync state
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         if (user.user_id) {
-          const API_URL =
-            import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-          const res = await fetch(
-            `${API_URL}/api/faculty/sessions/active?faculty_id=${user.user_id}`,
+          const { data: activeSessionsData } = await api.get(
+            "/faculty/sessions/active",
+            { params: { faculty_id: user.user_id } },
           );
-          if (res.ok) {
-            const activeSessionsData = await res.json();
-            const sessionMap = {};
-            activeSessionsData.forEach((session) => {
-              sessionMap[session.class_id] = {
-                status: "active",
-                sessionId: session.session_id,
-                generatedCode: session.generated_code,
-                startTime: session.start_time,
-              };
-            });
-            setActiveSessions(sessionMap);
-          }
+          const sessionMap = {};
+          activeSessionsData.forEach((session) => {
+            sessionMap[session.class_id] = {
+              status: "active",
+              sessionId: session.session_id,
+              generatedCode: session.generated_code,
+              startTime: session.start_time,
+            };
+          });
+          setActiveSessions(sessionMap);
         }
       } catch (error) {
         toast({
@@ -489,15 +485,10 @@ const FacultyDashboard = () => {
     try {
       // Always fetch from backend to ensure we have the latest active session
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-      const res = await fetch(
-        `${API_URL}/class/${classItem.class_id}/active-session`,
+      const { data } = await api.get(
+        `/class/${classItem.class_id}/active-session`,
+        { baseURL: API_URL },
       );
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch active session");
-      }
-
-      const data = await res.json();
 
       if (data.session_id) {
         // Update context with the active session info
