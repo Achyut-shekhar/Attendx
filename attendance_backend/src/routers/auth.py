@@ -5,13 +5,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.core.database import engine, get_db
 from src.core.security import verify_password, get_password_hash, create_access_token, create_reset_token, create_reset_token_expiry, verify_token, get_current_user
 from src.core.email import send_password_reset_email
-from src.core.config import FACULTY_REGISTER_KEY
+from src.core.config import FACULTY_REGISTER_KEY, RESET_ADMIN_KEY
 from src.models.schemas import (
     LoginRequest, RegisterRequest, ForgotPasswordRequest, 
-    ResetPasswordRequest, DeleteAccountRequest
+    ResetPasswordRequest, DeleteAccountRequest, VerifyAdminKeyRequest
 )
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+import secrets
 
 router = APIRouter(tags=["auth"])
 
@@ -443,5 +444,23 @@ async def register_device(
         await db.rollback()
         print(f"[REGISTER_DEVICE] ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/auth/verify-admin-key")
+async def verify_admin_key(request: VerifyAdminKeyRequest):
+    """Verify the Admin Reset Key for device unlock bypass"""
+    server_admin_key = RESET_ADMIN_KEY
+    if not server_admin_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Admin reset is disabled on server."
+        )
+    if not secrets.compare_digest(request.admin_key, server_admin_key):
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid admin reset key"
+        )
+    return {"ok": True}
+
 
 

@@ -18,10 +18,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
 export default function LoginScreen() {
-  // const [email, setEmail] = useState('');
-  // const [password, setPassword] = useState('');
-  // const [loading, setLoading] = useState(false);
-  // const [lockedEmail, setLockedEmail] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -130,10 +126,6 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.forgotPassword}>
-          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.loginButton}
           onPress={handleLogin}
@@ -154,8 +146,8 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.registerContainer}>
-            <Text style={[styles.registerText, { textAlign: 'center', fontSize: 13 }]}>
+          <View style={[styles.registerContainer, { flexDirection: 'column', alignItems: 'center' }]}>
+            <Text style={[styles.registerText, { textAlign: 'center', fontSize: 13, marginBottom: 8 }]}>
               This device is permanently linked to {lockedEmail}. Switching accounts is blocked by security policy.
             </Text>
           </View>
@@ -250,15 +242,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#222B45',
   },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 30,
-  },
-  forgotPasswordText: {
-    color: '#6C63FF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   loginButton: {
     backgroundColor: '#6C63FF',
     borderRadius: 12,
@@ -270,6 +253,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 15,
     elevation: 8,
+    marginTop: 20,
   },
   loginButtonText: {
     color: '#FFFFFF',

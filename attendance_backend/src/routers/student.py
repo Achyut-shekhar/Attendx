@@ -273,3 +273,21 @@ async def get_student_attendance_history(class_id: int, student_id: int, current
             return [dict(r._mapping) for r in result]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/student/device-status")
+async def get_device_status(device_id: str, current_user: dict = Depends(require_student)):
+    try:
+        sql = text(
+            """
+            SELECT 1 FROM device_tokens 
+            WHERE user_id = :user_id AND device_id = :device_id
+            LIMIT 1
+            """
+        )
+        async with engine.connect() as conn:
+            res = await conn.execute(sql, {"user_id": current_user["user_id"], "device_id": device_id})
+            row = res.fetchone()
+            return {"registered": row is not None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

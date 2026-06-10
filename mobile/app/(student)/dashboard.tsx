@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 
 interface ClassItem {
   class_id: number;
@@ -16,7 +17,7 @@ interface ClassItem {
 }
 
 export default function StudentDashboard() {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const router = useRouter();
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,8 +30,44 @@ export default function StudentDashboard() {
   const [section, setSection] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
+  const handleDevLogout = () => {
+    if (!__DEV__) return;
+    Alert.alert('Development Mode', 'Switch to a different account?', [
+      { text: 'Cancel', onPress: () => {} },
+      {
+        text: 'Logout',
+        onPress: async () => {
+          await logout();
+        },
+        style: 'destructive',
+      },
+    ]);
+  };
+
   const fetchClasses = async () => {
+    if (!user?.user_id) return;
     try {
+      // Check device status
+      const deviceId = await SecureStore.getItemAsync('device_id');
+      if (deviceId) {
+        try {
+          const deviceStatusRes = await api.get('/api/student/device-status', {
+            params: { device_id: deviceId }
+          });
+          if (deviceStatusRes.data && deviceStatusRes.data.registered === false) {
+            // Force logout
+            await SecureStore.deleteItemAsync('locked_user_email');
+            await SecureStore.deleteItemAsync('is_device_registered');
+            await SecureStore.deleteItemAsync('locked_user_id');
+            await logout();
+            Alert.alert('Device Deregistered', 'This device has been deregistered by the faculty. You have been logged out.');
+            return;
+          }
+        } catch (deviceError) {
+          console.warn('[StudentDashboard] Error checking device status:', deviceError);
+        }
+      }
+
       const response = await api.get(`/api/student/classes`, {
         params: { student_id: user?.user_id }
       });
@@ -187,10 +224,12 @@ export default function StudentDashboard() {
             {classes.length} enrolled class{classes.length !== 1 ? 'es' : ''}
           </Text>
         </View>
-        <TouchableOpacity style={styles.joinButton} onPress={() => setJoinModalVisible(true)}>
-          <Ionicons name="add" size={20} color="#FFFFFF" />
-          <Text style={styles.joinButtonText}>Join Class</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.joinButton} onPress={() => setJoinModalVisible(true)}>
+            <Ionicons name="add" size={20} color="#FFFFFF" />
+            <Text style={styles.joinButtonText}>Join Class</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.statsRow}>
@@ -343,6 +382,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#222B45' },
   headerSubtitle: { fontSize: 13, color: '#8F9BB3', marginTop: 2 },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -357,6 +401,20 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   joinButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14, marginLeft: 4 },
+  devLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEAEA',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  devLogoutText: {
+    color: '#FF6B6B',
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
 
   statsRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 16 },
   statCard: {
@@ -481,6 +539,15 @@ const styles = StyleSheet.create({
     color: '#8F9BB3',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  emptyJoinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6C63FF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 20,
   },
 
   // ── JOIN CLASS MODAL (full-screen, solid) ──

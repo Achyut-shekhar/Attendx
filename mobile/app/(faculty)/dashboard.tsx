@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import * as Location from 'expo-location';
 
 interface ClassItem {
   class_id: number;
@@ -20,39 +21,99 @@ interface SessionStat {
   last_session: string | null;
 }
 
+interface UserItem {
+  user_id: number;
+  name: string;
+  email: string;
+  role: 'STUDENT' | 'FACULTY';
+}
+
 export default function FacultyDashboard() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [stats, setStats] = useState<Record<number, SessionStat>>({});
+  const [studentCounts, setStudentCounts] = useState<Record<number, number>>({});
+  const [activeSessions, setActiveSessions] = useState<Record<number, any>>({});
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Create class modal
+  // Modals visibility
   const [createVisible, setCreateVisible] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [creating, setCreating] = useState(false);
 
+  // Location-based Session Modal States
+  const [startSessionVisible, setStartSessionVisible] = useState(false);
+  const [classToStart, setClassToStart] = useState<ClassItem | null>(null);
+  const [useLocation, setUseLocation] = useState(false);
+  const [radiusMeters, setRadiusMeters] = useState(500);
+  const [customRadius, setCustomRadius] = useState('500');
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+  const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; accuracy: number | null } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [startingSession, setStartingSession] = useState(false);
+
+  // Reset Password Modal States
+  const [resetPasswordVisible, setResetPasswordVisible] = useState(false);
+  const [allUsers, setAllUsers] = useState<UserItem[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [adminKey, setAdminKey] = useState('');
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [deregisteringDevice, setDeregisteringDevice] = useState(false);
+
+  // Delete Class Modal States
+  const [deleteClassVisible, setDeleteClassVisible] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<ClassItem | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deletingClass, setDeletingClass] = useState(false);
+
   const fetchClasses = useCallback(async () => {
+    if (!user?.user_id) return;
     try {
       const res = await api.get(`/api/faculty/${user?.user_id}/classes`);
       const list: ClassItem[] = res.data;
       setClasses(list);
 
-      // Fetch session stats for each class in parallel
-      const statResults = await Promise.allSettled(
-        list.map((c) =>
-          api.get(`/api/faculty/classes/${c.class_id}/sessions/stats`)
-        )
-      );
+      // Fetch session stats & student count for each class in parallel
+      const detailsPromises = list.map(async (c) => {
+        const statsRes = api.get(`/api/faculty/classes/${c.class_id}/sessions/stats`).catch(() => null);
+        const studentsRes = api.get(`/api/faculty/classes/${c.class_id}/students`).catch(() => null);
+        return { class_id: c.class_id, statsRes: await statsRes, studentsRes: await studentsRes };
+      });
+
+      const detailsResults = await Promise.all(detailsPromises);
       const statMap: Record<number, SessionStat> = {};
-      statResults.forEach((r, i) => {
-        if (r.status === 'fulfilled') {
-          statMap[list[i].class_id] = r.value.data;
+      const countMap: Record<number, number> = {};
+
+      detailsResults.forEach((r) => {
+        if (r.statsRes) {
+          statMap[r.class_id] = r.statsRes.data;
+        }
+        if (r.studentsRes) {
+          countMap[r.class_id] = Array.isArray(r.studentsRes.data) ? r.studentsRes.data.length : 0;
         }
       });
+
       setStats(statMap);
+      setStudentCounts(countMap);
+
+      // Fetch active sessions
+      const activeRes = await api.get(`/api/faculty/sessions/active?faculty_id=${user?.user_id}`);
+      const activeList = activeRes.data;
+      const activeMap: Record<number, any> = {};
+      activeList.forEach((session: any) => {
+        activeMap[session.class_id] = session;
+      });
+      setActiveSessions(activeMap);
+
     } catch (e: any) {
       console.error('[FacultyDashboard]', e?.response?.data || e.message);
     } finally {
@@ -80,6 +141,7 @@ export default function FacultyDashboard() {
       await api.post('/api/faculty/classes', {
         class_name: newClassName.trim(),
         faculty_id: user?.user_id,
+        join_code: '', // Will auto-generate on backend
       });
       setNewClassName('');
       setCreateVisible(false);
@@ -91,26 +153,214 @@ export default function FacultyDashboard() {
     }
   };
 
-  const handleDeleteClass = (classId: number, className: string) => {
+  const handleOpenDeleteClass = (classItem: ClassItem) => {
+    setClassToDelete(classItem);
+    setDeleteConfirmationText('');
+    setDeleteClassVisible(true);
+  };
+
+  const confirmDeleteClass = async () => {
+    if (!classToDelete) return;
+    if (deleteConfirmationText.trim().toLowerCase() !== 'delete') {
+      Alert.alert('Error', 'Please type "delete" to confirm.');
+      return;
+    }
+    setDeletingClass(true);
+    try {
+      await api.delete(`/api/faculty/classes/${classToDelete.class_id}`);
+      setDeleteClassVisible(false);
+      setClassToDelete(null);
+      fetchClasses();
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.detail || 'Could not delete class.');
+    } finally {
+      setDeletingClass(false);
+    }
+  };
+
+  // Location Session Handlers
+  const handleOpenStartSession = (classItem: ClassItem) => {
+    setClassToStart(classItem);
+    setUseLocation(false);
+    setRadiusMeters(500);
+    setCustomRadius('500');
+    setLocationData(null);
+    setLocationError(null);
+    setStartSessionVisible(true);
+  };
+
+  const toggleLocationGps = async (val: boolean) => {
+    setUseLocation(val);
+    if (val) {
+      setFetchingLocation(true);
+      setLocationError(null);
+      setLocationData(null);
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationError('Location access was denied');
+          setUseLocation(false);
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setLocationData({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          accuracy: loc.coords.accuracy,
+        });
+      } catch (err: any) {
+        setLocationError(err?.message || 'Failed to capture GPS coordinates');
+        setUseLocation(false);
+      } finally {
+        setFetchingLocation(false);
+      }
+    } else {
+      setLocationData(null);
+      setLocationError(null);
+    }
+  };
+
+  const proceedWithSessionStart = async () => {
+    if (!classToStart) return;
+    let rad = radiusMeters;
+    if (useLocation) {
+      rad = parseInt(customRadius, 10);
+      if (isNaN(rad) || rad < 0 || rad > 1000) {
+        Alert.alert('Validation Error', 'Radius must be between 0 and 1000 meters.');
+        return;
+      }
+      if (!locationData) {
+        Alert.alert('Error', 'GPS location not captured yet.');
+        return;
+      }
+    }
+
+    setStartingSession(true);
+    try {
+      const res = await api.post(`/api/faculty/classes/${classToStart.class_id}/sessions`, {
+        class_id: classToStart.class_id,
+        latitude: useLocation && locationData ? locationData.latitude : null,
+        longitude: useLocation && locationData ? locationData.longitude : null,
+        radius_meters: useLocation ? rad : 50, // Default 50 if no location
+      });
+      
+      setStartSessionVisible(false);
+      setClassToStart(null);
+      fetchClasses();
+
+      // Navigate to live session attendance screen
+      router.push(`/(faculty)/session/${res.data.session_id}`);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.detail || 'Could not start session.');
+    } finally {
+      setStartingSession(false);
+    }
+  };
+
+  const handleEndSession = (classItem: ClassItem, sessionId: number) => {
     Alert.alert(
-      'Delete Class',
-      `Are you sure you want to delete "${className}"? All sessions and attendance records will be lost.`,
+      'End Session',
+      `Are you sure you want to end the session for "${classItem.class_name}"? All unmarked students will be marked absent.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'End Session',
           style: 'destructive',
           onPress: async () => {
             try {
-              await api.delete(`/api/faculty/classes/${classId}`);
+              await api.put(`/api/faculty/classes/${classItem.class_id}/sessions/${sessionId}/end`);
               fetchClasses();
+              Alert.alert('Success', 'Session ended. Navigating to final roster.');
+              router.push(`/(faculty)/session/${sessionId}`);
             } catch (e: any) {
-              Alert.alert('Error', e?.response?.data?.detail || 'Could not delete class.');
+              Alert.alert('Error', e?.response?.data?.detail || 'Could not end session.');
             }
           },
         },
       ]
     );
+  };
+
+  // Reset Password Modal Handlers
+  const handleOpenResetPassword = async () => {
+    setResetPasswordVisible(true);
+    setSelectedUser(null);
+    setUserSearch('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setAdminKey('');
+    try {
+      const res = await api.get('/api/faculty/users');
+      setAllUsers(res.data || []);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to load users.');
+    }
+  };
+
+  const handleSelectUser = (userItem: UserItem) => {
+    setSelectedUser(userItem);
+    setNewPassword('');
+    setConfirmPassword('');
+    setAdminKey('');
+    setShowNewPwd(false);
+    setShowConfirmPwd(false);
+  };
+
+  const handleAdminResetPassword = async () => {
+    if (!selectedUser) return;
+    if (newPassword.length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Validation Error', 'Passwords do not match.');
+      return;
+    }
+    if (!adminKey.trim()) {
+      Alert.alert('Validation Error', 'Admin Reset Key is required.');
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      await api.post('/api/faculty/admin/reset-password', {
+        user_id: selectedUser.user_id,
+        new_password: newPassword,
+        admin_key: adminKey.trim(),
+      });
+      Alert.alert('Success', `Password for ${selectedUser.name} has been reset successfully.`);
+      setSelectedUser(null);
+      setNewPassword('');
+      setConfirmPassword('');
+      setAdminKey('');
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.detail || 'Failed to reset password.');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  const handleAdminDeregisterDevice = async () => {
+    if (!selectedUser) return;
+    if (!adminKey.trim()) {
+      Alert.alert('Validation Error', 'Admin Reset Key is required to clear device bindings.');
+      return;
+    }
+    setDeregisteringDevice(true);
+    try {
+      const res = await api.post('/api/faculty/admin/deregister-device', {
+        user_id: selectedUser.user_id,
+        admin_key: adminKey.trim(),
+      });
+      Alert.alert('Success', res.data.message || `Device bindings for ${selectedUser.name} cleared successfully.`);
+      setSelectedUser(null);
+      setAdminKey('');
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.detail || 'Failed to clear device bindings.');
+    } finally {
+      setDeregisteringDevice(false);
+    }
   };
 
   const handleLogout = () => {
@@ -134,14 +384,17 @@ export default function FacultyDashboard() {
     );
   }
 
-  const renderClass = ({ item }: { item: ClassItem }) => {
+  // Split classes into active (live) and other classes
+  const liveClasses = classes.filter(c => activeSessions[c.class_id]);
+  const otherClasses = classes.filter(c => !activeSessions[c.class_id]);
+
+  const renderClassCard = (item: ClassItem, isLive: boolean) => {
     const stat = stats[item.class_id];
+    const studentCount = studentCounts[item.class_id] ?? 0;
+    const sessionInfo = activeSessions[item.class_id];
+
     return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.85}
-        onPress={() => router.push(`/(faculty)/class/${item.class_id}`)}
-      >
+      <View key={item.class_id} style={styles.card}>
         {/* Card Header */}
         <View style={styles.cardHeader}>
           <View style={styles.iconWrap}>
@@ -151,36 +404,82 @@ export default function FacultyDashboard() {
             <Text style={styles.cardTitle} numberOfLines={1}>{item.class_name}</Text>
             <View style={styles.codeRow}>
               <Ionicons name="key-outline" size={13} color="#8F9BB3" />
-              <Text style={styles.codeText}>  Join Code: </Text>
+              <Text style={styles.codeText}> Join Code: </Text>
               <Text style={styles.codeValue}>{item.join_code}</Text>
             </View>
           </View>
+          
+          {isLive && (
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          )}
+
           <TouchableOpacity
             style={styles.deleteBtn}
-            onPress={() => handleDeleteClass(item.class_id, item.class_name)}
+            onPress={() => handleOpenDeleteClass(item)}
           >
             <Ionicons name="trash-outline" size={18} color="#FF3B30" />
           </TouchableOpacity>
         </View>
 
-        {/* Stats row */}
+        {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Ionicons name="calendar-outline" size={14} color="#8F9BB3" />
-            <Text style={styles.statLabel}>  {stat?.sessions_count ?? 0} Sessions</Text>
+            <Ionicons name="people-outline" size={14} color="#8F9BB3" />
+            <Text style={styles.statLabel}> {studentCount} Students</Text>
           </View>
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={14} color="#8F9BB3" />
-            <Text style={styles.statLabel}>  {formatDate(stat?.last_session ?? null)}</Text>
+            <Ionicons name="calendar-outline" size={14} color="#8F9BB3" />
+            <Text style={styles.statLabel}> {stat?.sessions_count ?? 0} Sessions</Text>
           </View>
         </View>
+        
+        {stat?.last_session && (
+          <View style={[styles.statItem, { marginBottom: 12 }]}>
+            <Ionicons name="time-outline" size={14} color="#8F9BB3" />
+            <Text style={styles.statLabel}> Last: {formatDate(stat.last_session)}</Text>
+          </View>
+        )}
 
-        {/* Tap to manage */}
-        <View style={styles.manageRow}>
-          <Text style={styles.manageText}>Manage & Start Session</Text>
-          <Ionicons name="chevron-forward" size={16} color="#2D6AE0" />
-        </View>
-      </TouchableOpacity>
+        {/* Action Row */}
+        {isLive ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnOutline, { marginRight: 8 }]}
+              onPress={() => router.push(`/(faculty)/session/${sessionInfo.session_id}`)}
+            >
+              <Ionicons name="people" size={16} color="#2D6AE0" />
+              <Text style={styles.actionBtnTextOutline}> View Attendance</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnDanger]}
+              onPress={() => handleEndSession(item, sessionInfo.session_id)}
+            >
+              <Ionicons name="stop-circle" size={16} color="#FFFFFF" />
+              <Text style={styles.actionBtnTextPrimary}> End Session</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnOutline, { marginRight: 8 }]}
+              onPress={() => router.push(`/(faculty)/class/${item.class_id}`)}
+            >
+              <Ionicons name="analytics" size={16} color="#2D6AE0" />
+              <Text style={styles.actionBtnTextOutline}> View Details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnPrimary]}
+              onPress={() => handleOpenStartSession(item)}
+            >
+              <Ionicons name="play-circle" size={16} color="#FFFFFF" />
+              <Text style={styles.actionBtnTextPrimary}> Start Session</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -192,28 +491,52 @@ export default function FacultyDashboard() {
           <Text style={styles.greetingHello}>Hello, {user?.name?.split(' ')[0]} 👋</Text>
           <Text style={styles.greetingRole}>Faculty · AttendX</Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-          <Ionicons name="log-out-outline" size={22} color="#FF3B30" />
-        </TouchableOpacity>
+        <View style={styles.greetingActions}>
+          <TouchableOpacity onPress={handleOpenResetPassword} style={[styles.actionHeaderBtn, { marginRight: 8 }]}>
+            <Ionicons name="key-outline" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.actionHeaderBtn}>
+            <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {classes.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons name="school-outline" size={64} color="#C5CEE0" />
-          <Text style={styles.emptyTitle}>No Classes Yet</Text>
-          <Text style={styles.emptyText}>Tap the + button to create your first class.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={classes}
-          keyExtractor={(item) => item.class_id.toString()}
-          renderItem={renderClass}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2D6AE0']} />
-          }
-        />
-      )}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2D6AE0']} />}
+      >
+        {classes.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="school-outline" size={64} color="#C5CEE0" />
+            <Text style={styles.emptyTitle}>No Classes Yet</Text>
+            <Text style={styles.emptyText}>Tap the + button to create your first class.</Text>
+          </View>
+        ) : (
+          <View>
+            {/* Live sessions */}
+            {liveClasses.length > 0 && (
+              <View>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.livePulseDot} />
+                  <Text style={styles.sectionTitle}>Active Sessions</Text>
+                </View>
+                {liveClasses.map(c => renderClassCard(c, true))}
+              </View>
+            )}
+
+            {/* Other Classes */}
+            {otherClasses.length > 0 && (
+              <View style={{ marginTop: liveClasses.length > 0 ? 16 : 0 }}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="sparkles-outline" size={16} color="#2D6AE0" />
+                  <Text style={styles.sectionTitle}>Your Classes</Text>
+                </View>
+                {otherClasses.map(c => renderClassCard(c, false))}
+              </View>
+            )}
+          </View>
+        )}
+      </ScrollView>
 
       {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={() => setCreateVisible(true)}>
@@ -252,6 +575,255 @@ export default function FacultyDashboard() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Delete Class Confirmation Modal */}
+      <Modal visible={deleteClassVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={[styles.modalTitle, { color: '#FF3B30' }]}>Delete Class?</Text>
+            <Text style={styles.modalSubtitle}>
+              Are you sure you want to permanently delete "{classToDelete?.class_name}"? This action is irreversible and deletes all sessions & attendance logs.
+            </Text>
+            <Text style={styles.inputLabel}>Please type <Text style={{ fontWeight: 'bold', color: '#FF3B30' }}>delete</Text> to confirm:</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder='Type "delete" here'
+              placeholderTextColor="#8F9BB3"
+              value={deleteConfirmationText}
+              onChangeText={setDeleteConfirmationText}
+              autoCapitalize="none"
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.modalConfirmBtn, { backgroundColor: '#FF3B30' }, (deletingClass || deleteConfirmationText.trim().toLowerCase() !== 'delete') && { opacity: 0.5 }]}
+              onPress={confirmDeleteClass}
+              disabled={deletingClass || deleteConfirmationText.trim().toLowerCase() !== 'delete'}
+            >
+              {deletingClass ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.modalConfirmBtnText}>Delete Permanently</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setDeleteClassVisible(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Start Session with Location Modal */}
+      <Modal visible={startSessionVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Start Attendance Session</Text>
+            <Text style={styles.modalSubtitle}>
+              Configure details for "{classToStart?.class_name}".
+            </Text>
+
+            {/* GPS verification toggle */}
+            <TouchableOpacity
+              style={styles.toggleRow}
+              onPress={() => toggleLocationGps(!useLocation)}
+            >
+              <View style={styles.toggleTextWrap}>
+                <Text style={styles.toggleLabel}>GPS Location Verification</Text>
+                <Text style={styles.toggleDesc}>Students must be physically in the classroom to check-in.</Text>
+              </View>
+              <Ionicons
+                name={useLocation ? "checkbox" : "square-outline"}
+                size={24}
+                color={useLocation ? "#2D6AE0" : "#8F9BB3"}
+              />
+            </TouchableOpacity>
+
+            {useLocation && (
+              <View style={styles.gpsConfigWrap}>
+                {fetchingLocation ? (
+                  <View style={styles.gpsLoading}>
+                    <ActivityIndicator size="small" color="#2D6AE0" />
+                    <Text style={styles.gpsLoadingText}> Capturing current GPS location...</Text>
+                  </View>
+                ) : locationError ? (
+                  <View style={[styles.gpsBanner, styles.gpsBannerError]}>
+                    <Ionicons name="alert-circle" size={16} color="#FF3B30" />
+                    <Text style={styles.gpsBannerTextError}> {locationError}</Text>
+                  </View>
+                ) : locationData ? (
+                  <View style={[styles.gpsBanner, styles.gpsBannerSuccess]}>
+                    <Ionicons name="checkmark-circle" size={16} color="#00B388" />
+                    <Text style={styles.gpsBannerTextSuccess}>
+                      {` GPS captured (±${locationData.accuracy ? Math.round(locationData.accuracy) : '?'}m accuracy)`}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Text style={[styles.inputLabel, { marginTop: 10 }]}>Allowed Radius (meters, 0-1000)</Text>
+                <View style={styles.radiusInputRow}>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                    keyboardType="number-pad"
+                    value={customRadius}
+                    onChangeText={setCustomRadius}
+                    placeholder="Radius in meters"
+                  />
+                  <Text style={styles.radiusUnitText}> meters</Text>
+                </View>
+                <Text style={styles.inputHint}>Recommended: 50m to 200m. 0m means strict accuracy bound.</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.modalConfirmBtn, startingSession && { opacity: 0.7 }]}
+              onPress={proceedWithSessionStart}
+              disabled={startingSession || (useLocation && !locationData)}
+            >
+              {startingSession ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.modalConfirmBtnText}>Start Session</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setStartSessionVisible(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Reset Password & Device Bindings Modal */}
+      <Modal visible={resetPasswordVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { height: '85%' }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>User Account Administration</Text>
+            <Text style={styles.modalSubtitle}>Reset passwords or clear device bindings for students/faculty.</Text>
+
+            {!selectedUser ? (
+              <View style={{ flex: 1 }}>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Search user by name or email..."
+                  placeholderTextColor="#8F9BB3"
+                  value={userSearch}
+                  onChangeText={setUserSearch}
+                />
+                <ScrollView style={{ flex: 1, marginTop: 10 }}>
+                  {allUsers
+                    .filter(u =>
+                      u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+                      u.email.toLowerCase().includes(userSearch.toLowerCase())
+                    )
+                    .map(u => (
+                      <TouchableOpacity
+                        key={u.user_id}
+                        style={styles.userListItem}
+                        onPress={() => handleSelectUser(u)}
+                      >
+                        <View>
+                          <Text style={styles.userListName}>{u.name}</Text>
+                          <Text style={styles.userListEmail}>{u.email}</Text>
+                        </View>
+                        <View style={[styles.roleBadge, u.role === 'FACULTY' ? styles.roleFaculty : styles.roleStudent]}>
+                          <Text style={[styles.roleText, u.role === 'FACULTY' ? { color: '#2D6AE0' } : { color: '#00B388' }]}>
+                            {u.role}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
+              </View>
+            ) : (
+              <ScrollView style={{ flex: 1 }}>
+                {/* Selected user summary */}
+                <View style={styles.selectedUserBox}>
+                  <View>
+                    <Text style={styles.selectedUserName}>{selectedUser.name}</Text>
+                    <Text style={styles.selectedUserEmail}>{selectedUser.email}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedUser(null)}>
+                    <Text style={styles.changeUserText}>Change</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Password input */}
+                <Text style={styles.inputLabel}>New Password (Min 6 chars)</Text>
+                <View style={styles.pwdInputRow}>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1 }]}
+                    secureTextEntry={!showNewPwd}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="Enter new password"
+                  />
+                  <TouchableOpacity style={styles.pwdEye} onPress={() => setShowNewPwd(!showNewPwd)}>
+                    <Ionicons name={showNewPwd ? "eye-off-outline" : "eye-outline"} size={20} color="#8F9BB3" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.inputLabel}>Confirm Password</Text>
+                <View style={styles.pwdInputRow}>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1 }]}
+                    secureTextEntry={!showConfirmPwd}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Re-enter new password"
+                  />
+                  <TouchableOpacity style={styles.pwdEye} onPress={() => setShowConfirmPwd(!showConfirmPwd)}>
+                    <Ionicons name={showConfirmPwd ? "eye-off-outline" : "eye-outline"} size={20} color="#8F9BB3" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Admin key */}
+                <Text style={[styles.inputLabel, { color: '#E28743' }]}>Admin Reset Key</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  secureTextEntry
+                  value={adminKey}
+                  onChangeText={setAdminKey}
+                  placeholder="Enter secret authorization key"
+                />
+
+                {/* Action buttons */}
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtn, { backgroundColor: '#E28743', marginTop: 10 }, resettingPassword && { opacity: 0.7 }]}
+                  onPress={handleAdminResetPassword}
+                  disabled={resettingPassword || !newPassword || !confirmPassword || !adminKey}
+                >
+                  {resettingPassword ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.modalConfirmBtnText}>Reset Password</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtn, { backgroundColor: '#FF3B30' }, deregisteringDevice && { opacity: 0.7 }]}
+                  onPress={handleAdminDeregisterDevice}
+                  disabled={deregisteringDevice || !adminKey}
+                >
+                  {deregisteringDevice ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.modalConfirmBtnText}>Clear Device Lock / Bindings</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => setResetPasswordVisible(false)}
+              disabled={resettingPassword || deregisteringDevice}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -270,12 +842,24 @@ const styles = StyleSheet.create({
   },
   greetingHello: { fontSize: 20, fontWeight: '800', color: '#FFFFFF' },
   greetingRole: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  logoutBtn: {
+  greetingActions: { flexDirection: 'row', alignItems: 'center' },
+  actionHeaderBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.18)',
     justifyContent: 'center', alignItems: 'center',
   },
-  list: { padding: 16, paddingBottom: 100 },
+  scrollContent: { padding: 16, paddingBottom: 100 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#222B45', marginLeft: 6 },
+  livePulseDot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#FF3B30',
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
@@ -299,14 +883,53 @@ const styles = StyleSheet.create({
   codeText: { fontSize: 12, color: '#8F9BB3' },
   codeValue: { fontSize: 12, color: '#2D6AE0', fontWeight: '700', letterSpacing: 1 },
   deleteBtn: { padding: 6 },
-  statsRow: { flexDirection: 'row', gap: 16, marginBottom: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F2F5' },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEAEA',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  liveDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: '#FF3B30',
+    marginRight: 4,
+  },
+  liveText: { fontSize: 10, fontWeight: '800', color: '#FF3B30' },
+  statsRow: { flexDirection: 'row', gap: 16, marginBottom: 6 },
   statItem: { flexDirection: 'row', alignItems: 'center' },
   statLabel: { fontSize: 12, color: '#8F9BB3', fontWeight: '500' },
-  manageRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  actionRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F2F5',
+    paddingTop: 12,
   },
-  manageText: { fontSize: 13, color: '#2D6AE0', fontWeight: '700' },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 40,
+    borderRadius: 10,
+  },
+  actionBtnOutline: {
+    borderWidth: 1.5,
+    borderColor: '#EAF0FF',
+    backgroundColor: '#FFFFFF',
+  },
+  actionBtnPrimary: {
+    backgroundColor: '#2D6AE0',
+  },
+  actionBtnDanger: {
+    backgroundColor: '#FF3B30',
+  },
+  actionBtnTextOutline: { color: '#2D6AE0', fontSize: 13, fontWeight: '700' },
+  actionBtnTextPrimary: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, paddingTop: 100 },
   emptyTitle: { fontSize: 22, fontWeight: '700', color: '#222B45', marginTop: 20, marginBottom: 8 },
   emptyText: { fontSize: 15, color: '#8F9BB3', textAlign: 'center', lineHeight: 22 },
   fab: {
@@ -331,17 +954,112 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0', alignSelf: 'center', marginBottom: 20,
   },
   modalTitle: { fontSize: 22, fontWeight: '800', color: '#222B45', marginBottom: 6 },
-  modalSubtitle: { fontSize: 14, color: '#8F9BB3', marginBottom: 20 },
+  modalSubtitle: { fontSize: 14, color: '#8F9BB3', marginBottom: 20, lineHeight: 20 },
   modalInput: {
     borderWidth: 1.5, borderColor: '#E4E9F2', borderRadius: 14,
     paddingHorizontal: 16, paddingVertical: 14,
     fontSize: 16, color: '#222B45', marginBottom: 16,
   },
+  inputLabel: { fontSize: 14, fontWeight: '700', color: '#222B45', marginBottom: 8 },
+  inputHint: { fontSize: 12, color: '#8F9BB3', marginTop: -10, marginBottom: 14 },
   modalCreateBtn: {
     backgroundColor: '#2D6AE0', borderRadius: 14,
     paddingVertical: 16, alignItems: 'center', marginBottom: 12,
   },
   modalCreateBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  modalConfirmBtn: {
+    backgroundColor: '#2D6AE0', borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center', marginBottom: 12,
+  },
+  modalConfirmBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   modalCancelBtn: { alignItems: 'center', paddingVertical: 10 },
   modalCancelText: { color: '#8F9BB3', fontSize: 15 },
+
+  // GPS styles
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E4E9F2',
+  },
+  toggleTextWrap: { flex: 1, marginRight: 12 },
+  toggleLabel: { fontSize: 15, fontWeight: '700', color: '#222B45', marginBottom: 4 },
+  toggleDesc: { fontSize: 12, color: '#8F9BB3', lineHeight: 16 },
+  gpsConfigWrap: { marginBottom: 16 },
+  gpsLoading: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
+  gpsLoadingText: { fontSize: 13, color: '#2D6AE0', fontWeight: '500' },
+  gpsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginVertical: 4,
+  },
+  gpsBannerSuccess: {
+    backgroundColor: '#E6FBFA',
+    borderColor: '#00D09E',
+  },
+  gpsBannerError: {
+    backgroundColor: '#FFEAEA',
+    borderColor: '#FF3B30',
+  },
+  gpsBannerTextSuccess: { color: '#00B388', fontSize: 13, fontWeight: '500' },
+  gpsBannerTextError: { color: '#FF3B30', fontSize: 13, fontWeight: '500' },
+  radiusInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  radiusUnitText: { fontSize: 15, color: '#222B45', fontWeight: '600' },
+
+  // Roster lists & detail inside modal styles
+  userListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F2F5',
+  },
+  userListName: { fontSize: 15, fontWeight: '700', color: '#222B45', marginBottom: 2 },
+  userListEmail: { fontSize: 12, color: '#8F9BB3' },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  roleFaculty: { backgroundColor: '#EAF0FF' },
+  roleStudent: { backgroundColor: '#E6FBFA' },
+  roleText: { fontSize: 11, fontWeight: '800' },
+
+  selectedUserBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E4E9F2',
+  },
+  selectedUserName: { fontSize: 16, fontWeight: '800', color: '#222B45', marginBottom: 2 },
+  selectedUserEmail: { fontSize: 13, color: '#8F9BB3' },
+  changeUserText: { fontSize: 13, fontWeight: '700', color: '#2D6AE0', textDecorationLine: 'underline' },
+  pwdInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pwdEye: {
+    position: 'absolute',
+    right: 14,
+    top: 14,
+    zIndex: 10,
+  },
 });

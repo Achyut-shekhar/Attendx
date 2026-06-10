@@ -99,3 +99,13 @@ class DeviceToken(BaseModel):
     biometric_enrolled: bool
     expo_push_token: Optional[str]
     created_at: str
+
+
+class VerifyAdminKeyRequest(BaseModel):
+    admin_key: str
+
+
+class AdminDeregisterDeviceRequest(BaseModel):
+    user_id: int
+    admin_key: str
+

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import text, bindparam
 from src.core.database import engine
 from src.core.utils import generate_code
-from src.models.schemas import CreateClassRequest, StartSessionRequest, MarkAttendanceRequest, AdminResetPasswordRequest
+from src.models.schemas import CreateClassRequest, StartSessionRequest, MarkAttendanceRequest, AdminResetPasswordRequest, AdminDeregisterDeviceRequest
 from src import queries
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -649,4 +649,50 @@ async def get_all_sessions_with_attendance(class_id: int, current_user: dict = D
         print(f"[EXPORT_ALL_SESSIONS] ERROR: {str(e)}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/faculty/admin/deregister-device")
+async def deregister_device(request: AdminDeregisterDeviceRequest, current_user: dict = Depends(require_faculty)):
+    """Faculty-only: deregister any user's device bindings (delete device tokens)"""
+    try:
+        # Secure comparison of admin confirmation key
+        server_admin_key = RESET_ADMIN_KEY
+        if not server_admin_key:
+            raise HTTPException(
+                status_code=500,
+                detail="Deregister is disabled: Admin reset key is not configured."
+            )
+        
+        if not secrets.compare_digest(request.admin_key, server_admin_key):
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid admin key. Access denied."
+            )
+
+        async with engine.begin() as conn:
+            # Check if user exists
+            check_sql = text("SELECT user_id, name, email FROM users WHERE user_id = :user_id")
+            result = await conn.execute(check_sql, {"user_id": request.user_id})
+            user = result.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Delete device tokens
+            delete_sql = text("DELETE FROM device_tokens WHERE user_id = :user_id")
+            res = await conn.execute(delete_sql, {"user_id": request.user_id})
+            deleted_count = res.rowcount
+
+        user_data = dict(user._mapping)
+        print(f"[ADMIN_DEREGISTER] Cleared device tokens for user_id={request.user_id} ({user_data['email']})")
+        return {
+            "message": f"Device tokens for {user_data['name']} have been cleared successfully. Deleted {deleted_count} tokens.",
+            "success": True
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ADMIN_DEREGISTER] ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 

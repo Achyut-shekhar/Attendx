@@ -27,13 +27,17 @@ export default function FacultyLayout() {
       <Tabs.Screen
         name="class/[id]"
         options={{
-          href: null, // Hidden from tab bar — opened programmatically
+          href: null,
+          title: 'Class Details',
+          tabBarStyle: { display: 'none' },
         }}
       />
       <Tabs.Screen
         name="session/[id]"
         options={{
-          href: null, // Hidden from tab bar — opened programmatically
+          href: null,
+          title: 'Session Attendance',
+          tabBarStyle: { display: 'none' },
         }}
       />
     </Tabs>
