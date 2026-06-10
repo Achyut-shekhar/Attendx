@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,10 +14,24 @@ interface ClassItem {
 }
 
 export default function StudentDashboard() {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleDevLogout = () => {
+    if (!__DEV__) return;
+    Alert.alert('Development Mode', 'Switch to a different account?', [
+      { text: 'Cancel', onPress: () => {} },
+      {
+        text: 'Logout',
+        onPress: async () => {
+          await logout();
+        },
+        style: 'destructive',
+      },
+    ]);
+  };
 
   const fetchClasses = async () => {
     try {
@@ -62,6 +76,12 @@ export default function StudentDashboard() {
         </View>
       </View>
       <View style={styles.classDetails}>
+        {__DEV__ && (
+          <TouchableOpacity style={styles.devLogoutBtn} onPress={handleDevLogout}>
+            <Ionicons name="exit" size={16} color="#FF6B6B" />
+            <Text style={styles.devLogoutText}>Dev: Logout</Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Roll Number</Text>
           <Text style={styles.detailValue}>{item.roll_number}</Text>
@@ -190,5 +210,20 @@ const styles = StyleSheet.create({
     color: '#8F9BB3',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  devLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEAEA',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  devLogoutText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });

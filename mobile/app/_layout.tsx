@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../store/authStore';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
@@ -23,14 +22,17 @@ export default function RootLayout() {
       router.replace('/(auth)/login');
     } else if (user) {
       if (!isDeviceRegistered) {
-        if (segments[1] !== 'setup-device') {
+        if (!segments.includes('setup-device')) {
           router.replace('/(auth)/setup-device');
         }
-      } else if (inAuthGroup) {
-        // Redirect to correct dashboard if authenticated and registered
-        if (user.role === 'STUDENT') {
+      } else {
+        // Redirect to correct dashboard if authenticated and registered, and not already there
+        const inStudentGroup = segments[0] === '(student)';
+        const inFacultyGroup = segments[0] === '(faculty)';
+
+        if (user.role === 'STUDENT' && !inStudentGroup) {
           router.replace('/(student)/dashboard');
-        } else {
+        } else if (user.role === 'FACULTY' && !inFacultyGroup) {
           router.replace('/(faculty)/dashboard');
         }
       }
@@ -46,14 +48,12 @@ export default function RootLayout() {
   }
 
   return (
-    <>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(student)" options={{ headerShown: false }} />
-        <Stack.Screen name="(faculty)" options={{ headerShown: false }} />
-      </Stack>
-    </>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(student)" />
+      <Stack.Screen name="(faculty)" />
+    </Stack>
   );
 }
 
