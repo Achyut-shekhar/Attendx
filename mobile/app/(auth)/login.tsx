@@ -146,10 +146,25 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={[styles.registerContainer, { flexDirection: 'column', alignItems: 'center' }]}>
+          <View style={[styles.registerContainer, { flexDirection: 'column', alignItems: 'center' }]}> 
             <Text style={[styles.registerText, { textAlign: 'center', fontSize: 13, marginBottom: 8 }]}>
+
               This device is permanently linked to {lockedEmail}. Switching accounts is blocked by security policy.
             </Text>
+            {__DEV__ && (
+              <TouchableOpacity
+                style={styles.devResetBtn}
+                onPress={async () => {
+                  await SecureStore.deleteItemAsync('locked_user_email');
+                  await SecureStore.deleteItemAsync('is_device_registered');
+                  setLockedEmail(null);
+                  setEmail('');
+                }}
+              >
+                <Ionicons name="refresh-circle-outline" size={16} color="#FF6B6B" />
+                <Text style={styles.devResetText}>Dev: Clear Device Lock / Switch Account</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -273,5 +288,20 @@ const styles = StyleSheet.create({
     color: '#6C63FF',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  devResetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEAEA',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginTop: 15,
+  },
+  devResetText: {
+    color: '#FF6B6B',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginLeft: 6,
   },
 });
