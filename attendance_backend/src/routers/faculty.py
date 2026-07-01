@@ -477,6 +477,64 @@ async def get_session_attendance_flat(session_id: int, current_user: dict = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+@router.get("/api/faculty/classes/{class_id}/students/attendance-stats")
+async def get_students_attendance_stats(
+    class_id: int,
+    min_pct: Optional[float] = None,
+    max_pct: Optional[float] = None,
+    current_user: dict = Depends(require_faculty)
+):
+    """
+    Returns all enrolled students in a class with their overall attendance percentage.
+    Optionally filter by min_pct and/or max_pct (0-100).
+    """
+    try:
+        sql = text(
+            """
+            SELECT
+                u.user_id AS student_id,
+                u.name AS student_name,
+                u.email,
+                ce.roll_number,
+                ce.section,
+                COUNT(s.session_id) AS total_sessions,
+                COUNT(CASE WHEN ar.status IN ('PRESENT', 'LATE') THEN 1 END) AS present_count,
+                CASE
+                    WHEN COUNT(s.session_id) = 0 THEN 0.0
+                    ELSE ROUND(
+                        COUNT(CASE WHEN ar.status IN ('PRESENT', 'LATE') THEN 1 END) * 100.0
+                        / COUNT(s.session_id),
+                        2
+                    )
+                END AS attendance_percentage
+            FROM class_enrollments ce
+            JOIN users u ON ce.student_id = u.user_id
+            CROSS JOIN (
+                SELECT session_id FROM attendance_sessions WHERE class_id = :class_id
+            ) s
+            LEFT JOIN attendance_records ar
+                ON ar.session_id = s.session_id AND ar.student_id = ce.student_id
+            WHERE ce.class_id = :class_id
+            GROUP BY u.user_id, u.name, u.email, ce.roll_number, ce.section
+            ORDER BY ce.section, ce.roll_number, u.name
+            """
+        )
+        async with engine.connect() as conn:
+            result = await conn.execute(sql, {"class_id": class_id})
+            rows = [dict(r._mapping) for r in result]
+
+        # Apply optional percentage filters in Python (avoids complex HAVING clause)
+        if min_pct is not None:
+            rows = [r for r in rows if r["attendance_percentage"] >= min_pct]
+        if max_pct is not None:
+            rows = [r for r in rows if r["attendance_percentage"] <= max_pct]
+
+        return rows
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # -------------------- FACULTY ADMIN: RESET PASSWORD --------------------
 
 @router.get("/api/faculty/users")

@@ -185,6 +185,18 @@ export const facultyAPI = {
     return data;
   },
 
+  // Get students with their overall attendance percentage for a class
+  async getStudentsAttendanceStats(class_id, { min_pct, max_pct } = {}) {
+    const params = {};
+    if (min_pct !== undefined && min_pct !== null) params.min_pct = min_pct;
+    if (max_pct !== undefined && max_pct !== null) params.max_pct = max_pct;
+    const { data } = await api.get(
+      `/faculty/classes/${class_id}/students/attendance-stats`,
+      { params },
+    );
+    return data;
+  },
+
   // ✅ Date-level — used ONLY for calendar view
   async getClassAttendanceByDate(class_id, date) {
     const { data } = await api.get(
