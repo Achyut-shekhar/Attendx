@@ -261,7 +261,8 @@ const FacultyDashboard = () => {
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [classToStart, setClassToStart] = useState(null);
   const [sessionLocation, setSessionLocation] = useState(null);
-  const [radiusMeters, setRadiusMeters] = useState(500);
+  const [radiusMeters, setRadiusMeters] = useState(100);
+  const [diameterInput, setDiameterInput] = useState("200"); // display state: user types diameter
 
   // Helper: enrich a class with dynamic stats (students count, sessions count, last session time)
   const enrichClassWithStats = async (cls) => {
@@ -434,7 +435,7 @@ const FacultyDashboard = () => {
       toast({
         title: "Session Started",
         description: useLocation
-          ? `${classToStart.class_name} session started with location-based attendance (${radiusMeters}m radius).`
+          ? `${classToStart.class_name} session started with location-based attendance (${radiusMeters * 2}m diameter zone).`
           : `${classToStart.class_name} session is active.`,
       });
     } catch (error) {
@@ -1103,18 +1104,24 @@ const FacultyDashboard = () => {
 
                 {sessionLocation && (
                   <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-3">
-                    <Label htmlFor="radius">Allowed Radius (meters)</Label>
+                    <Label htmlFor="diameter">Allowed Zone Diameter (meters)</Label>
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      The total area students must be within. Diameter = 2 × radius sent to backend.
+                    </p>
                     <div className="flex flex-wrap gap-2">
-                      {[500, 1000, 1500, 2000, 2500].map((r) => (
+                      {[50, 100, 200, 500, 1000].map((diamPreset) => (
                         <Button
-                          key={r}
+                          key={diamPreset}
                           type="button"
                           size="sm"
-                          variant={radiusMeters === r ? "default" : "outline"}
-                          onClick={() => setRadiusMeters(r)}
-                          className="min-w-[50px]"
+                          variant={radiusMeters === diamPreset / 2 ? "default" : "outline"}
+                          onClick={() => {
+                            setRadiusMeters(diamPreset / 2);
+                            setDiameterInput(String(diamPreset));
+                          }}
+                          className="min-w-[54px]"
                         >
-                          {r}m
+                          {diamPreset}m
                         </Button>
                       ))}
                     </div>
@@ -1123,29 +1130,42 @@ const FacultyDashboard = () => {
                         Custom:
                       </span>
                       <Input
-                        id="radius"
+                        id="diameter"
                         type="number"
-                        min="500"
-                        max="10000"
-                        step="500"
-                        value={radiusMeters}
+                        min="10"
+                        max="20000"
+                        step="10"
+                        value={diameterInput}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          if (!isNaN(val)) {
-                            const roundedVal = Math.round(val / 500) * 500;
-                            if (roundedVal >= 500 && roundedVal <= 10000) {
-                              setRadiusMeters(roundedVal);
-                            }
+                          const raw = e.target.value;
+                          setDiameterInput(raw); // allow free typing
+                          const val = parseInt(raw, 10);
+                          if (!isNaN(val) && val >= 10 && val <= 20000) {
+                            setRadiusMeters(Math.max(5, Math.round(val / 2)));
                           }
                         }}
-                        className="w-24"
+                        onBlur={(e) => {
+                          // On blur, snap to a clean value
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val >= 10) {
+                            const clamped = Math.min(20000, Math.max(10, val));
+                            const radius = Math.max(5, Math.round(clamped / 2));
+                            setRadiusMeters(radius);
+                            setDiameterInput(String(radius * 2));
+                          } else {
+                            // Reset to current radius if invalid
+                            setDiameterInput(String(radiusMeters * 2));
+                          }
+                        }}
+                        className="w-28"
                       />
                       <span className="text-xs text-muted-foreground">
-                        meters
+                        meters diameter
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Students must be within {radiusMeters}m of your location.
+                      Students must be within <strong>{radiusMeters}m</strong> of your location
+                      (zone diameter: <strong>{radiusMeters * 2}m</strong>).
                       GPS accuracy (±
                       {sessionLocation.accuracy
                         ? Math.round(sessionLocation.accuracy)

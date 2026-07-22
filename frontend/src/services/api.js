@@ -84,7 +84,7 @@ export const facultyAPI = {
     if (locationData) {
       payload.latitude = locationData.latitude;
       payload.longitude = locationData.longitude;
-      payload.radius_meters = locationData.radius_meters || 500;
+      payload.radius_meters = locationData.radius_meters || 100;
     }
 
     const { data } = await api.post(
