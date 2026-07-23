@@ -103,13 +103,15 @@ def handler(event, context):
         finally:
             new_loop.close()
 
-    # 2. To fix the Mangum asyncio event loop bug in newer Python versions
-    import threading
-
+    # 2. Ensure a usable event loop exists for Mangum (reuse if possible)
     try:
-        asyncio.get_running_loop()
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
     except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
     # 3. Otherwise, treat it as a standard HTTP request from API Gateway
     return _mangum_handler(event, context)
